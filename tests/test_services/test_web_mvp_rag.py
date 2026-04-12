@@ -1,9 +1,11 @@
 from __future__ import annotations
 
-import importlib.util
 import base64
-from types import SimpleNamespace
+import importlib.util
 from pathlib import Path
+from types import SimpleNamespace
+
+import pytest
 
 from openharness.config.settings import ProviderProfile, Settings
 from openharness.services.rag_store import RagStore
@@ -211,6 +213,7 @@ def test_run_document_summary_stores_detail_artifact(tmp_path: Path, monkeypatch
     )
     monkeypatch.setattr(module.RagStore, "for_project", classmethod(lambda cls, cwd: store))
     monkeypatch.setenv("OPENHARNESS_PROPOSAL_OUTPUT_DIR", str(tmp_path / "proposal_outputs"))
+
     monkeypatch.setattr(
         module,
         "run_announcement_analysis",
@@ -244,6 +247,131 @@ def test_run_document_summary_stores_detail_artifact(tmp_path: Path, monkeypatch
     assert "folder_plan" in result["proposal_ops"]
     assert result["announcement_agent"]["enabled"] is True
     assert result["announcement_agent"]["summary_workbook"].endswith("총괄장.xlsx")
+
+
+def test_run_announcement_agent_bundle_handles_folder_upload(
+    tmp_path: Path, monkeypatch
+) -> None:
+    module = load_web_mvp_server()
+    store = RagStore(tmp_path / "rag.sqlite3")
+
+    monkeypatch.setattr(module, "load_settings", settings_with_profiles)
+    monkeypatch.setattr(
+        module,
+        "create_embedding_backend_for_profile",
+        lambda *args, **kwargs: FakeEmbeddingBackend(),
+    )
+    monkeypatch.setattr(module.RagStore, "for_project", classmethod(lambda cls, cwd: store))
+    monkeypatch.setenv("OPENHARNESS_PROPOSAL_OUTPUT_DIR", str(tmp_path / "proposal_outputs"))
+
+    extracted_file_names: list[str] = []
+
+    def fake_extract_text(file_name: str, file_bytes: bytes) -> str:
+        extracted_file_names.append(file_name)
+        if not file_name.endswith(".pdf"):
+            raise AssertionError(f"Non-notice attachment should not be parsed: {file_name}")
+        return file_bytes.decode("utf-8")
+
+    monkeypatch.setattr(
+        module,
+        "extract_text_from_document",
+        fake_extract_text,
+    )
+    monkeypatch.setattr(
+        module,
+        "run_announcement_analysis",
+        lambda *args, **kwargs: SimpleNamespace(
+            workflow_name="announcement_analysis",
+            summary="Bundle summary",
+            structured={
+                "metadata": {
+                    "agency": "정보통신기획평가원",
+                    "ministry": "MSIT",
+                    "business_domain": "AI",
+                },
+                "announcement_overview": {
+                    "title": "AI Platform",
+                    "project_type": "R&D",
+                },
+                "application_schedule": {"submission_deadline": "2026-07-03 18:00"},
+            },
+            prompt_source_truncated=False,
+        ),
+    )
+
+    result = module._run_announcement_agent_bundle(
+        profile_name="gemini-compatible",
+        files=[
+            {
+                "file_name": "공고.pdf",
+                "relative_path": "upload_set/공고.pdf",
+                "file_data_base64": base64.b64encode(
+                    "공고 AI Platform deadline\n전문기관: 정보통신기획평가원".encode("utf-8")
+                ).decode("ascii"),
+            },
+            {
+                "file_name": "form.hwp",
+                "relative_path": "upload_set/forms/form.hwp",
+                "file_data_base64": base64.b64encode(b"Required form").decode("ascii"),
+            },
+        ],
+        instruction="Extract announcement fields.",
+        team_context="PM: submission",
+        system_prompt="Classify business domain.",
+    )
+
+    project_dir = Path(result["announcement_agent"]["project_dir"])
+
+    assert result["file_count"] == 2
+    assert result["primary_file_name"] == "공고.pdf"
+    assert result["primary_relative_path"] == "upload_set/공고.pdf"
+    assert result["structured"]["metadata"]["agency"] == "정보통신기획평가원"
+    assert extracted_file_names == ["공고.pdf"]
+    assert len(result["announcement_agent"]["saved_source_files"]) == 2
+    assert (project_dir / "upload_set" / "forms" / "form.hwp").exists()
+    assert Path(result["announcement_agent"]["attachment_manifest"]).exists()
+    assert result["announcement_agent"]["summary_workbook"].endswith("총괄장.xlsx")
+    assert Path(result["announcement_agent"]["monitoring_workbook"]).name.startswith(
+        "공고리스트_"
+    )
+    assert result["announcement_agent"]["dashboard_stats"]["by_business_domain"] == {"AI": 1}
+    assert result["announcement_agent"]["monitoring_row"]["agency"] == "IITP"
+    assert result["rag"]["indexed_document_count"] == 1
+    detail = module._get_rag_document_detail(result["rag"]["indexed_document_id"])
+    assert detail["structured"]["metadata"]["agency"] == "정보통신기획평가원"
+    assert result["attachment_files"][0]["role"] == "notice_pdf"
+    assert result["attachment_files"][1]["role"] == "attachment"
+    assert result["attachment_files"][1]["indexed"] is False
+
+
+def test_run_announcement_agent_bundle_requires_notice_pdf(
+    tmp_path: Path, monkeypatch
+) -> None:
+    module = load_web_mvp_server()
+    store = RagStore(tmp_path / "rag.sqlite3")
+
+    monkeypatch.setattr(module, "load_settings", settings_with_profiles)
+    monkeypatch.setattr(
+        module,
+        "create_embedding_backend_for_profile",
+        lambda *args, **kwargs: FakeEmbeddingBackend(),
+    )
+    monkeypatch.setattr(module.RagStore, "for_project", classmethod(lambda cls, cwd: store))
+
+    with pytest.raises(ValueError, match="PDF 공고"):
+        module._run_announcement_agent_bundle(
+            profile_name="gemini-compatible",
+            files=[
+                {
+                    "file_name": "form.txt",
+                    "relative_path": "upload_set/form.txt",
+                    "file_data_base64": base64.b64encode(b"Required form").decode("ascii"),
+                }
+            ],
+            instruction="Extract announcement fields.",
+            team_context="PM: submission",
+            system_prompt="Classify business domain.",
+        )
 
 
 def test_ingestion_state_and_review_update_helpers(tmp_path: Path, monkeypatch) -> None:

@@ -1,9 +1,9 @@
 {
   "roles": [
-    {"role": "COORDINATOR", "label": "제안 코디", "default_owner": "TBD"},
+    {"role": "COORDINATOR", "label": "제안 코디", "default_owner": "이역수 사장"},
     {"role": "PROPOSAL_LEAD", "label": "제안 담당자", "default_owner": "TBD"},
-    {"role": "PMO", "label": "제안 PMO 매니저", "default_owner": "TBD"},
-    {"role": "QUALITY", "label": "제안 품질 매니저", "default_owner": "TBD"},
+    {"role": "PMO", "label": "제안 PMO 매니저", "default_owner": "유미림 "},
+    {"role": "QUALITY", "label": "제안 품질 매니저", "default_owner": "권영진"},
     {"role": "BUDGET_OWNER", "label": "예산 책임자", "default_owner": "이역수 사장"},
     {"role": "SUBMISSION_MANAGER", "label": "접수 담당자", "default_owner": "강경숙 대표 + 염현준 선임"},
     {"role": "LEAD_AGENCY", "label": "주관기관 담당자", "default_owner": "TBD"},

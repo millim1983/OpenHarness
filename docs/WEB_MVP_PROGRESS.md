@@ -32,6 +32,11 @@ Completed:
 - Web document upload now attempts to index extracted text into the project-local RAG store
 - Web chat now retrieves relevant indexed chunks and injects them into the runtime prompt when available
 - Browser status text now reports RAG indexing/retrieval status after upload and chat requests
+- 공고 에이전트 is now a separate web workspace for folder/file-set upload and first-pass announcement automation
+- 공고 에이전트 now creates only the announcement-stage folder, saves the uploaded file set, generates `총괄장.xlsx`, and updates `공고리스트_yyyymmdd.xlsx`
+- 공고 에이전트 now requires a PDF notice file identified by `공고` in the file name or extracted text, and uses that PDF as the structured-analysis source
+- 공고 에이전트 skips parsing non-notice attachments such as HWP/Excel/PPT, saves them as original files, and records their file metadata in `첨부파일목록.json`
+- Proposal folder-tree creation is intentionally deferred until the later proposal-drive stage after a proposal decision
 
 ## Files Added For The Web MVP
 - `frontend/web/index.html`
@@ -57,6 +62,7 @@ Handles:
 - rendering the answer
 - copy button behavior
 - uploading one document and rendering extracted text + summary + structured insights + internal execution plan
+- uploading a folder/file set for 공고 에이전트 and rendering generated-file plus 공고리스트 dashboard results
 
 ### `scripts/web_mvp_server.py`
 A very small Python server that:
@@ -64,6 +70,7 @@ A very small Python server that:
 - exposes `/api/profiles`
 - exposes `/api/chat`
 - exposes `/api/process-document`
+- exposes `/api/announcement-agent/run`
 - reuses existing OpenHarness settings and profiles
 - runs one prompt through the internal OpenHarness runtime and returns the answer
 

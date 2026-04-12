@@ -38,6 +38,15 @@ const workspaceViews = Array.from(document.querySelectorAll(".workspace-view[dat
 const proposalOpsOutput = document.querySelector("#proposalOpsOutput");
 const copyProposalOpsButton = document.querySelector("#copyProposalOpsButton");
 const announcementAgentMeta = document.querySelector("#announcementAgentMeta");
+const announcementFolderInput = document.querySelector("#announcementFolderInput");
+const runAnnouncementAgentButton = document.querySelector("#runAnnouncementAgentButton");
+const copyAnnouncementAgentButton = document.querySelector("#copyAnnouncementAgentButton");
+const announcementFolderMeta = document.querySelector("#announcementFolderMeta");
+const announcementAgentOutput = document.querySelector("#announcementAgentOutput");
+const announcementDashboardOutput = document.querySelector("#announcementDashboardOutput");
+const announcementFeedbackInput = document.querySelector("#announcementFeedbackInput");
+const saveAnnouncementFeedbackButton = document.querySelector("#saveAnnouncementFeedbackButton");
+let lastAnnouncementAgentPayload = null;
 
 async function loadProfiles() {
   setStatus("Loading profiles...");
@@ -72,6 +81,8 @@ function setBusyState(isBusy) {
   saveProjectContextButton.disabled = isBusy;
   refreshRagButton.disabled = isBusy;
   refreshIngestionButton.disabled = isBusy;
+  runAnnouncementAgentButton.disabled = isBusy;
+  saveAnnouncementFeedbackButton.disabled = isBusy;
 }
 
 function switchView(viewName) {
@@ -494,6 +505,72 @@ function formatAnnouncementAgentMeta(agent) {
   ].join("\n");
 }
 
+function formatAnnouncementAgentBundleResult(payload) {
+  const agent = payload?.announcement_agent || {};
+  if (!agent.enabled) {
+    return "공고 에이전트 실행 결과가 없습니다.";
+  }
+  const row = agent.monitoring_row || {};
+  const generatedFiles = Array.isArray(agent.generated_files) ? agent.generated_files : [];
+  const savedSourceFiles = Array.isArray(agent.saved_source_files) ? agent.saved_source_files : [];
+  const lines = [
+    `처리 파일 수: ${payload.file_count || savedSourceFiles.length || 0}`,
+    `대표 공고 파일: ${payload.primary_file_name || row.source_file || "확인 필요"}`,
+    `생성 폴더: ${agent.project_dir || "확인 필요"}`,
+    `폴더명: ${agent.folder_name || "확인 필요"}`,
+    `총괄장: ${agent.summary_workbook || "미생성"}`,
+    `첨부파일목록: ${agent.attachment_manifest || "미생성"}`,
+    `공고리스트: ${agent.monitoring_workbook || "미생성"}`,
+    `공고리스트 원장: ${agent.monitoring_json || "미생성"}`,
+    `저장된 업로드 파일: ${savedSourceFiles.length}`,
+  ];
+  if (generatedFiles.length > 0) {
+    lines.push("");
+    lines.push("생성 파일");
+    for (const filePath of generatedFiles) {
+      lines.push(`- ${filePath}`);
+    }
+  }
+  lines.push("");
+  lines.push("공고목록 행");
+  lines.push(`- 업로드일자: ${row.uploaded_at || ""}`);
+  lines.push(`- 부처: ${row.ministry || ""}`);
+  lines.push(`- 전문기관: ${row.agency || ""}`);
+  lines.push(`- 사업구분: ${row.business_type || ""}`);
+  lines.push(`- 사업분야: ${row.business_domain || ""}`);
+  lines.push(`- 사업명: ${row.program_name || ""}`);
+  lines.push(`- 접수마감일자: ${row.submission_deadline || ""}`);
+  return lines.join("\n").trim();
+}
+
+function formatAnnouncementDashboard(stats) {
+  if (!stats || typeof stats !== "object") {
+    return "아직 대시보드 결과가 없습니다.";
+  }
+  const lines = [`총 공고 수: ${stats.total_count || 0}`];
+  appendCountGroup(lines, "일자별 업로드 수량", stats.by_upload_date);
+  appendCountGroup(lines, "부처별", stats.by_ministry);
+  appendCountGroup(lines, "사업유형별", stats.by_business_type);
+  appendCountGroup(lines, "사업분야별", stats.by_business_domain);
+  return lines.join("\n").trim();
+}
+
+function appendCountGroup(lines, title, counts) {
+  if (!counts || typeof counts !== "object") {
+    return;
+  }
+  lines.push("");
+  lines.push(title);
+  const entries = Object.entries(counts);
+  if (entries.length === 0) {
+    lines.push("- 없음");
+    return;
+  }
+  for (const [label, count] of entries) {
+    lines.push(`- ${label}: ${count}`);
+  }
+}
+
 function appendObjectList(lines, title, items, formatter) {
   if (!Array.isArray(items) || items.length === 0) {
     return;
@@ -601,6 +678,7 @@ function formatStructuredInsights(structured) {
     return "No structured insights yet.";
   }
 
+  const metadata = structured.metadata || {};
   const overview = structured.announcement_overview || {};
   const consortium = structured.consortium_requirements || {};
   const eligibility = Array.isArray(structured.eligibility_by_role) ? structured.eligibility_by_role : [];
@@ -625,6 +703,19 @@ function formatStructuredInsights(structured) {
   }
   if (overview.support_summary) {
     lines.push(`Support summary: ${overview.support_summary}`);
+  }
+  if (metadata.ministry || metadata.agency || metadata.rd_or_non_rd) {
+    lines.push("");
+    lines.push("Source metadata:");
+    if (metadata.ministry) {
+      lines.push(`- Ministry: ${metadata.ministry}`);
+    }
+    if (metadata.agency) {
+      lines.push(`- Agency: ${metadata.agency}`);
+    }
+    if (metadata.rd_or_non_rd) {
+      lines.push(`- R&D classification: ${metadata.rd_or_non_rd}`);
+    }
   }
 
   lines.push("");
@@ -904,6 +995,125 @@ async function processDocument() {
   }
 }
 
+async function runAnnouncementAgentBundle() {
+  const files = Array.from(announcementFolderInput.files || []);
+  const profile = profileSelect.value;
+  const systemPrompt = systemPromptInput.value.trim();
+  const baseInstruction = documentInstructionInput.value.trim();
+  const feedbackInstruction = announcementFeedbackInput.value.trim();
+  const instruction = feedbackInstruction
+    ? `${baseInstruction}\n\n사용자 교정/확인사항:\n${feedbackInstruction}`.trim()
+    : baseInstruction;
+  const teamContext = teamContextInput.value.trim();
+
+  if (files.length === 0) {
+    setStatus("공고 파일 세트가 들어있는 폴더를 먼저 선택하세요.");
+    announcementFolderInput.focus();
+    return;
+  }
+
+  setBusyState(true);
+  announcementFolderMeta.textContent = `${files.length}개 파일 처리 중...`;
+  announcementAgentOutput.textContent = "공고 분석과 파일 생성을 실행 중입니다.";
+  announcementDashboardOutput.textContent = "공고리스트 대시보드 갱신 중입니다.";
+  setStatus(`공고 에이전트 실행 중: ${files.length}개 파일`);
+
+  try {
+    const encodedFiles = [];
+    for (const file of files) {
+      const arrayBuffer = await file.arrayBuffer();
+      encodedFiles.push({
+        file_name: file.name,
+        relative_path: file.webkitRelativePath || file.name,
+        file_data_base64: bytesToBase64(new Uint8Array(arrayBuffer)),
+      });
+    }
+    const response = await fetch("/api/announcement-agent/run", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({
+        profile,
+        files: encodedFiles,
+        system_prompt: systemPrompt,
+        instruction,
+        team_context: teamContext,
+      }),
+    });
+
+    const payload = await response.json();
+    if (!response.ok) {
+      throw new Error(payload.error || "공고 에이전트 실행에 실패했습니다.");
+    }
+
+    const agent = payload.announcement_agent || {};
+    lastAnnouncementAgentPayload = payload;
+    announcementFolderMeta.textContent =
+      `${payload.file_count || files.length}개 파일 처리 완료. 생성 폴더: ${agent.project_dir || "확인 필요"}`;
+    announcementAgentOutput.textContent = formatAnnouncementAgentBundleResult(payload);
+    announcementDashboardOutput.textContent = formatAnnouncementDashboard(agent.dashboard_stats);
+    proposalOpsOutput.textContent = formatProposalOpsPlan(payload.proposal_ops);
+    announcementAgentMeta.textContent = formatAnnouncementAgentMeta(agent);
+    if (payload.structured) {
+      documentStructuredOutput.textContent = formatStructuredInsights(payload.structured);
+      documentExecutionOutput.textContent = formatExecutionPlan(payload.structured);
+    }
+    documentSummaryOutput.textContent = payload.summary || documentSummaryOutput.textContent;
+    if (payload.rag) {
+      renderRagDocuments(payload.rag);
+    }
+    await loadIngestionState();
+    setStatus(`공고 에이전트 완료. ${formatRagStatus(payload.rag)}`);
+  } catch (error) {
+    const message = String(error.message || error);
+    announcementFolderMeta.textContent = "공고 에이전트 실행 실패.";
+    announcementAgentOutput.textContent = message;
+    announcementDashboardOutput.textContent = message;
+    setStatus("공고 에이전트 요청 실패.");
+  } finally {
+    setBusyState(false);
+  }
+}
+
+async function saveAnnouncementFeedback() {
+  const feedback = announcementFeedbackInput.value.trim();
+  if (!feedback) {
+    setStatus("저장할 피드백을 입력하세요.");
+    announcementFeedbackInput.focus();
+    return;
+  }
+
+  setBusyState(true);
+  setStatus("공고 에이전트 피드백 저장 중...");
+  try {
+    const payload = lastAnnouncementAgentPayload || {};
+    const response = await fetch("/api/announcement-agent/feedback", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({
+        profile: profileSelect.value,
+        feedback,
+        primary_file_name: payload.primary_file_name || "",
+        document_id: payload.rag?.indexed_document_id || 0,
+        structured: payload.structured || {},
+        announcement_agent: payload.announcement_agent || {},
+      }),
+    });
+    const saved = await response.json();
+    if (!response.ok) {
+      throw new Error(saved.error || "피드백 저장에 실패했습니다.");
+    }
+    setStatus(`피드백 저장 완료: ${saved.feedback_path}`);
+  } catch (error) {
+    setStatus(String(error.message || error));
+  } finally {
+    setBusyState(false);
+  }
+}
+
 function handleDocumentSelection() {
   const file = documentInput.files?.[0];
   if (!file) {
@@ -916,6 +1126,23 @@ function handleDocumentSelection() {
   documentSummaryOutput.textContent = "No summary yet.";
   documentStructuredOutput.textContent = "No structured insights yet.";
   documentExecutionOutput.textContent = "No internal execution plan yet.";
+}
+
+function handleAnnouncementFolderSelection() {
+  const files = Array.from(announcementFolderInput.files || []);
+  if (files.length === 0) {
+    announcementFolderMeta.textContent = "선택된 폴더가 없습니다.";
+    return;
+  }
+  const folderName = files[0].webkitRelativePath
+    ? files[0].webkitRelativePath.split("/")[0]
+    : "선택한 파일 세트";
+  const totalBytes = files.reduce((sum, file) => sum + file.size, 0);
+  announcementFolderMeta.textContent =
+    `${folderName}: ${files.length}개 파일, ${(totalBytes / 1024 / 1024).toFixed(2)} MB`;
+  announcementAgentOutput.textContent =
+    "실행 버튼을 누르면 PDF 공고 파일을 찾아 분석한 뒤 공고 폴더, 총괄장, 공고리스트가 생성됩니다.";
+  announcementDashboardOutput.textContent = "실행 후 일자별, 부처별, 사업유형별, 사업분야별 집계가 표시됩니다.";
 }
 
 refreshRagButton.addEventListener("click", async () => {
@@ -994,12 +1221,24 @@ processDocumentButton.addEventListener("click", () => {
   void processDocument();
 });
 
+runAnnouncementAgentButton.addEventListener("click", () => {
+  void runAnnouncementAgentBundle();
+});
+
+saveAnnouncementFeedbackButton.addEventListener("click", () => {
+  void saveAnnouncementFeedback();
+});
+
 saveProjectContextButton.addEventListener("click", () => {
   void saveProjectContext();
 });
 
 documentInput.addEventListener("change", () => {
   handleDocumentSelection();
+});
+
+announcementFolderInput.addEventListener("change", () => {
+  handleAnnouncementFolderSelection();
 });
 
 copyExtractedButton.addEventListener("click", () => {
@@ -1031,6 +1270,14 @@ copyProposalOpsButton.addEventListener("click", () => {
     proposalOpsOutput.textContent,
     "No proposal operations plan yet.",
     "Proposal operations plan copied."
+  );
+});
+
+copyAnnouncementAgentButton.addEventListener("click", () => {
+  void copyText(
+    announcementAgentOutput.textContent,
+    "아직 실행 결과가 없습니다.",
+    "공고 에이전트 실행 결과가 복사되었습니다."
   );
 });
 

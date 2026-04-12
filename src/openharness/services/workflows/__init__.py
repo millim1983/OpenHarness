@@ -3,6 +3,7 @@
 from openharness.services.workflows.announcement import run_announcement_analysis
 from openharness.services.workflows.announcement_agent import (
     AnnouncementAgentRequest,
+    AnnouncementSourceFile,
     run_announcement_agent,
 )
 from openharness.services.workflows.base import DocumentWorkflowRequest, DocumentWorkflowResult
@@ -15,6 +16,7 @@ __all__ = [
     "DocumentWorkflowRequest",
     "DocumentWorkflowResult",
     "AnnouncementAgentRequest",
+    "AnnouncementSourceFile",
     "ProposalOpsRequest",
     "build_proposal_ops_preview",
     "run_announcement_agent",

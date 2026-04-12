@@ -381,6 +381,9 @@ def _agency_and_ministry(contacts: list[dict[str, str]], extracted_text: str) ->
             extracted_text,
             "agency",
             "전담기관",
+            "전문기관",
+            "발주처",
+            "사업담당부서",
             "수행기관",
             "주관기관",
         )

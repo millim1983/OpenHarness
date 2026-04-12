@@ -1,10 +1,12 @@
 from __future__ import annotations
 
+import json
 from pathlib import Path
 from zipfile import ZipFile
 
 from openharness.services.workflows.announcement_agent import (
     AnnouncementAgentRequest,
+    AnnouncementSourceFile,
     run_announcement_agent,
 )
 
@@ -51,10 +53,17 @@ def test_run_announcement_agent_creates_project_folder_and_workbooks(tmp_path: P
     assert project_dir.exists()
     assert result["folder_name"].startswith("260501-KIAT-AI_Product_Support")
     assert result["monitoring_row"]["agency"] == "KIAT"
+    assert result["monitoring_row"]["business_domain"] == "Commercialization"
     assert Path(result["saved_source_files"][0]).read_bytes() == b"pdf bytes"
     assert Path(result["summary_workbook"]).exists()
+    assert Path(result["summary_workbook"]).parent == project_dir
+    assert Path(result["attachment_manifest"]).exists()
     assert Path(result["monitoring_workbook"]).exists()
+    assert Path(result["monitoring_workbook"]).name.startswith("공고리스트_")
     assert Path(result["monitoring_json"]).exists()
+    assert result["created_folders"] == [str(project_dir)]
+    assert result["dashboard_stats"]["total_count"] == 1
+    assert result["dashboard_stats"]["by_business_domain"] == {"Commercialization": 1}
 
     with ZipFile(result["summary_workbook"]) as workbook:
         assert "xl/worksheets/sheet1.xml" in workbook.namelist()
@@ -82,6 +91,50 @@ def test_run_announcement_agent_uses_full_agency_name_when_alias_missing(
 
     assert result["folder_name"].startswith("260602-서울특별시-Smart_City_SI")
     assert result["monitoring_row"]["agency"] == "서울특별시"
+
+
+def test_run_announcement_agent_saves_uploaded_file_set_without_proposal_tree(
+    tmp_path: Path,
+) -> None:
+    result = run_announcement_agent(
+        AnnouncementAgentRequest(
+            file_name="notice.pdf",
+            file_bytes=b"pdf bytes",
+            output_root=tmp_path,
+            source_files=[
+                AnnouncementSourceFile(
+                    file_name="notice.pdf",
+                    file_bytes=b"notice bytes",
+                    relative_path="upload_set/notice.pdf",
+                ),
+                AnnouncementSourceFile(
+                    file_name="form.xlsx",
+                    file_bytes=b"form bytes",
+                    relative_path="upload_set/forms/form.xlsx",
+                ),
+            ],
+            structured_analysis={
+                "metadata": {"agency": "정보통신기획평가원", "ministry": "MSIT"},
+                "announcement_overview": {"title": "AI Platform", "project_type": "R&D"},
+                "application_schedule": {"submission_deadline": "2026-07-03 18:00"},
+            },
+        )
+    )
+
+    project_dir = Path(result["project_dir"])
+
+    assert (project_dir / "upload_set" / "notice.pdf").read_bytes() == b"notice bytes"
+    assert (project_dir / "upload_set" / "forms" / "form.xlsx").read_bytes() == b"form bytes"
+    assert not (project_dir / "01.공고 및 양식").exists()
+    assert not (project_dir / "99.휴지통").exists()
+    attachment_manifest = json.loads(
+        Path(result["attachment_manifest"]).read_text(encoding="utf-8")
+    )
+    assert attachment_manifest[0]["role"] == "notice_pdf"
+    assert attachment_manifest[1]["role"] == "attachment"
+    assert attachment_manifest[1]["indexed"] is False
+    assert Path(result["summary_workbook"]).parent == project_dir
+    assert len(result["saved_source_files"]) == 2
 
 
 def test_run_announcement_agent_can_be_disabled(tmp_path: Path, monkeypatch) -> None:

@@ -14,14 +14,22 @@ from openharness.services.workflows.proposal_ops import build_proposal_ops_previ
 from openharness.services.workflows.proposal_config import (
     feature_enabled,
     load_folder_rules,
-    load_folder_tree,
 )
 from openharness.services.workflows.xlsx_writer import write_xlsx
 
 
 SUMMARY_WORKBOOK_NAME = "총괄장.xlsx"
-MONITORING_WORKBOOK_NAME = "공고_모니터링.xlsx"
-MONITORING_JSON_NAME = "공고_모니터링.json"
+MONITORING_JSON_NAME = "공고리스트.json"
+ATTACHMENT_MANIFEST_NAME = "첨부파일목록.json"
+
+
+@dataclass(frozen=True)
+class AnnouncementSourceFile:
+    """One uploaded file belonging to an announcement bundle."""
+
+    file_name: str
+    file_bytes: bytes
+    relative_path: str = ""
 
 
 @dataclass(frozen=True)
@@ -34,6 +42,7 @@ class AnnouncementAgentRequest:
     instruction: str = ""
     team_context: str = ""
     output_root: str | Path | None = None
+    source_files: list[AnnouncementSourceFile] | None = None
 
 
 def run_announcement_agent(request: AnnouncementAgentRequest) -> dict[str, Any]:
@@ -64,14 +73,22 @@ def run_announcement_agent(request: AnnouncementAgentRequest) -> dict[str, Any]:
         )
     )
     project_dir = output_root / folder_name
-    source_dir = project_dir / "00_공고_원문"
-    source_dir.mkdir(parents=True, exist_ok=True)
+    project_dir.mkdir(parents=True, exist_ok=True)
 
-    saved_source_path = source_dir / Path(request.file_name).name
     saved_source_files: list[str] = []
+    source_files = _source_files(request)
     if feature_enabled("announcement_agent.save_uploaded_source_files", True):
-        saved_source_path.write_bytes(request.file_bytes)
-        saved_source_files.append(str(saved_source_path))
+        for source_file in source_files:
+            saved_source_path = project_dir / _safe_relative_path(source_file)
+            saved_source_path.parent.mkdir(parents=True, exist_ok=True)
+            saved_source_path.write_bytes(source_file.file_bytes)
+            saved_source_files.append(str(saved_source_path))
+    attachment_manifest = project_dir / ATTACHMENT_MANIFEST_NAME
+    attachment_manifest.write_text(
+        json.dumps(_attachment_manifest_rows(source_files, request.file_name), ensure_ascii=False, indent=2)
+        + "\n",
+        encoding="utf-8",
+    )
 
     proposal_ops = build_proposal_ops_preview(
         request=_proposal_ops_request(
@@ -81,19 +98,16 @@ def run_announcement_agent(request: AnnouncementAgentRequest) -> dict[str, Any]:
             team_context=request.team_context,
         )
     )
-    configured_folders = load_folder_tree()
-    for folder in configured_folders:
-        (project_dir / folder).mkdir(parents=True, exist_ok=True)
-
-    summary_workbook = project_dir / "99_관리로그" / SUMMARY_WORKBOOK_NAME
-    generated_files: list[str] = []
+    summary_workbook = project_dir / SUMMARY_WORKBOOK_NAME
+    generated_files: list[str] = [str(attachment_manifest)]
     if feature_enabled("announcement_agent.generate_summary_workbook", True):
         write_xlsx(summary_workbook, _summary_workbook_sheets(structured, proposal_ops))
         generated_files.append(str(summary_workbook))
 
     monitoring_json = output_root / MONITORING_JSON_NAME
     row = _monitoring_row(request.file_name, structured)
-    monitoring_workbook = output_root / MONITORING_WORKBOOK_NAME
+    monitoring_workbook = output_root / _monitoring_workbook_name()
+    monitoring_rows: list[dict[str, str]] = []
     if feature_enabled("announcement_agent.update_monitoring_workbook", True):
         monitoring_rows = _load_monitoring_rows(monitoring_json)
         monitoring_rows = [
@@ -105,7 +119,13 @@ def run_announcement_agent(request: AnnouncementAgentRequest) -> dict[str, Any]:
             json.dumps(monitoring_rows, ensure_ascii=False, indent=2) + "\n",
             encoding="utf-8",
         )
-        write_xlsx(monitoring_workbook, {"공고목록": _monitoring_sheet_rows(monitoring_rows)})
+        write_xlsx(
+            monitoring_workbook,
+            {
+                "공고목록": _monitoring_sheet_rows(monitoring_rows),
+                "대시보드": _monitoring_dashboard_rows(monitoring_rows),
+            },
+        )
         generated_files.append(str(monitoring_workbook))
 
     return {
@@ -115,12 +135,42 @@ def run_announcement_agent(request: AnnouncementAgentRequest) -> dict[str, Any]:
         "folder_name": folder_name,
         "saved_source_files": saved_source_files,
         "summary_workbook": str(summary_workbook),
+        "attachment_manifest": str(attachment_manifest),
         "monitoring_workbook": str(monitoring_workbook),
         "monitoring_json": str(monitoring_json),
         "generated_files": generated_files,
-        "created_folders": [str(project_dir / folder) for folder in configured_folders],
+        "created_folders": [str(project_dir)],
         "monitoring_row": row,
+        "dashboard_stats": _monitoring_stats(monitoring_rows),
     }
+
+
+def _source_files(request: AnnouncementAgentRequest) -> list[AnnouncementSourceFile]:
+    if request.source_files:
+        return request.source_files
+    return [
+        AnnouncementSourceFile(
+            file_name=request.file_name,
+            file_bytes=request.file_bytes,
+            relative_path=request.file_name,
+        )
+    ]
+
+
+def _attachment_manifest_rows(
+    source_files: list[AnnouncementSourceFile], notice_file_name: str
+) -> list[dict[str, Any]]:
+    return [
+        {
+            "file_name": source_file.file_name,
+            "relative_path": source_file.relative_path or source_file.file_name,
+            "extension": Path(source_file.file_name).suffix.lower(),
+            "size_bytes": len(source_file.file_bytes),
+            "role": "notice_pdf" if source_file.file_name == notice_file_name else "attachment",
+            "indexed": source_file.file_name == notice_file_name,
+        }
+        for source_file in source_files
+    ]
 
 
 def _proposal_ops_request(
@@ -252,6 +302,13 @@ def _monitoring_row(file_name: str, structured: dict[str, Any]) -> dict[str, str
         "ministry": str(metadata.get("ministry") or ""),
         "agency": _agency_folder_label(structured),
         "business_type": str(overview.get("project_type") or ""),
+        "business_domain": str(
+            metadata.get("business_domain")
+            or metadata.get("technology_domain")
+            or overview.get("technology_domain")
+            or overview.get("main_purpose")
+            or ""
+        ),
         "program_name": str(overview.get("title") or ""),
         "task_count": "",
         "budget_per_task_eok": str(budget.get("total_amount") or ""),
@@ -267,6 +324,7 @@ def _monitoring_sheet_rows(rows: list[dict[str, str]]) -> list[list[object]]:
         "부처",
         "전문기관",
         "사업구분",
+        "사업분야",
         "사업명",
         "과제수",
         "과제당총 연구비(억원)",
@@ -281,6 +339,7 @@ def _monitoring_sheet_rows(rows: list[dict[str, str]]) -> list[list[object]]:
             row["ministry"],
             row["agency"],
             row["business_type"],
+            row.get("business_domain", ""),
             row["program_name"],
             row["task_count"],
             row["budget_per_task_eok"],
@@ -293,6 +352,40 @@ def _monitoring_sheet_rows(rows: list[dict[str, str]]) -> list[list[object]]:
     ]
 
 
+def _monitoring_dashboard_rows(rows: list[dict[str, str]]) -> list[list[object]]:
+    return [
+        ["구분", "값", "수량"],
+        *_counter_rows("업로드일자", _group_counts(row["uploaded_at"][:10] for row in rows)),
+        *_counter_rows("부처", _group_counts(row["ministry"] or "미분류" for row in rows)),
+        *_counter_rows("사업구분", _group_counts(row["business_type"] or "미분류" for row in rows)),
+        *_counter_rows("사업분야", _group_counts(row.get("business_domain", "") or "미분류" for row in rows)),
+    ]
+
+
+def _monitoring_stats(rows: list[dict[str, str]]) -> dict[str, Any]:
+    return {
+        "total_count": len(rows),
+        "by_upload_date": _group_counts(row["uploaded_at"][:10] for row in rows),
+        "by_ministry": _group_counts(row["ministry"] or "미분류" for row in rows),
+        "by_business_type": _group_counts(row["business_type"] or "미분류" for row in rows),
+        "by_business_domain": _group_counts(
+            row.get("business_domain", "") or "미분류" for row in rows
+        ),
+    }
+
+
+def _counter_rows(category: str, counts: dict[str, int]) -> list[list[object]]:
+    return [[category, key, value] for key, value in sorted(counts.items())]
+
+
+def _group_counts(values: Any) -> dict[str, int]:
+    counts: dict[str, int] = {}
+    for value in values:
+        key = str(value or "미분류")
+        counts[key] = counts.get(key, 0) + 1
+    return counts
+
+
 def _load_monitoring_rows(path: Path) -> list[dict[str, str]]:
     if not path.exists():
         return []
@@ -303,6 +396,10 @@ def _load_monitoring_rows(path: Path) -> list[dict[str, str]]:
     if not isinstance(payload, list):
         return []
     return [item for item in payload if isinstance(item, dict)]
+
+
+def _monitoring_workbook_name() -> str:
+    return f"공고리스트_{datetime.now().strftime('%Y%m%d')}.xlsx"
 
 
 def _deadline_for_folder(schedule: dict[str, Any]) -> str:
@@ -344,9 +441,21 @@ def _yes_no(value: Any) -> str:
 
 
 def _safe_path_segment(value: str) -> str:
-    cleaned = "".join(char if char.isalnum() or char == "-" else "_" for char in value.strip())
+    cleaned = "".join(char if char.isalnum() or char in {"-", "."} else "_" for char in value.strip())
     cleaned = "_".join(part for part in cleaned.split("_") if part)
     return cleaned[:120] or "untitled"
+
+
+def _safe_relative_path(source_file: AnnouncementSourceFile) -> Path:
+    raw_path = source_file.relative_path or source_file.file_name
+    parts = []
+    for part in Path(raw_path).parts:
+        if part in {"", ".", ".."}:
+            continue
+        parts.append(_safe_path_segment(part))
+    if not parts:
+        parts.append(_safe_path_segment(source_file.file_name))
+    return Path(*parts)
 
 
 def _as_dict(value: Any) -> dict[str, Any]:

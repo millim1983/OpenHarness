@@ -6,6 +6,7 @@ import base64
 import json
 import os
 import sys
+from datetime import datetime
 from hashlib import sha1
 from http import HTTPStatus
 from http.server import SimpleHTTPRequestHandler, ThreadingHTTPServer
@@ -28,6 +29,7 @@ from openharness.services.rag_types import ChunkRecord, RagRetrievalFilters
 from openharness.services.web_runtime import run_single_prompt_sync
 from openharness.services.workflows import (
     AnnouncementAgentRequest,
+    AnnouncementSourceFile,
     DocumentWorkflowRequest,
     ProposalOpsRequest,
     build_proposal_ops_preview,
@@ -41,6 +43,7 @@ WEB_ROOT = REPO_ROOT / "frontend" / "web"
 DEFAULT_HOST = "127.0.0.1"
 DEFAULT_PORT = 8008
 MAX_UPLOAD_BYTES = 2 * 1024 * 1024
+MAX_AGENT_BUNDLE_BYTES = 20 * 1024 * 1024
 DEFAULT_RAG_TOP_K = 5
 DEFAULT_PROJECT_CONTEXT = {
     "system_prompt": (
@@ -76,6 +79,10 @@ def _project_context_path() -> Path:
     return get_project_config_dir(REPO_ROOT) / "web_mvp_context.json"
 
 
+def _announcement_agent_feedback_path() -> Path:
+    return get_project_config_dir(REPO_ROOT) / "announcement_agent_feedback.jsonl"
+
+
 def _load_project_context() -> dict[str, str]:
     path = _project_context_path()
     if not path.exists():
@@ -101,6 +108,27 @@ def _save_project_context(payload: dict[str, Any]) -> dict[str, str]:
     path = _project_context_path()
     path.write_text(json.dumps(current, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
     return current
+
+
+def _save_announcement_agent_feedback(payload: dict[str, Any]) -> dict[str, Any]:
+    feedback = str(payload.get("feedback", "")).strip()
+    if not feedback:
+        raise ValueError("`feedback` is required.")
+    record = {
+        "created_at": datetime.now().isoformat(timespec="seconds"),
+        "profile": str(payload.get("profile", "")).strip(),
+        "primary_file_name": str(payload.get("primary_file_name", "")).strip(),
+        "document_id": int(payload.get("document_id", 0) or 0),
+        "feedback": feedback,
+        "structured": payload.get("structured") if isinstance(payload.get("structured"), dict) else {},
+        "announcement_agent": payload.get("announcement_agent")
+        if isinstance(payload.get("announcement_agent"), dict)
+        else {},
+    }
+    path = _announcement_agent_feedback_path()
+    with path.open("a", encoding="utf-8") as handle:
+        handle.write(json.dumps(record, ensure_ascii=False, sort_keys=True) + "\n")
+    return {"saved": True, "feedback_path": str(path), "record": record}
 
 
 def _select_embedding_profile(
@@ -374,6 +402,199 @@ def _run_document_summary(
     }
 
 
+def _run_announcement_agent_bundle(
+    *,
+    profile_name: str,
+    files: list[dict[str, Any]],
+    instruction: str,
+    team_context: str,
+    system_prompt: str = "",
+) -> dict[str, Any]:
+    if not files:
+        raise ValueError("`files` must include at least one uploaded file.")
+
+    source_files: list[AnnouncementSourceFile] = []
+    file_items: list[dict[str, Any]] = []
+    total_bytes = 0
+
+    for file_payload in files:
+        file_name = str(file_payload.get("file_name", "")).strip()
+        relative_path = str(file_payload.get("relative_path", file_name)).strip() or file_name
+        file_data_b64 = str(file_payload.get("file_data_base64", "")).strip()
+        if not file_name:
+            raise ValueError("Each uploaded file requires `file_name`.")
+        if not file_data_b64:
+            raise ValueError(f"`file_data_base64` is required for {file_name}.")
+        try:
+            file_bytes = base64.b64decode(file_data_b64.encode("utf-8"), validate=True)
+        except ValueError as exc:
+            raise ValueError(f"Invalid uploaded file payload: {file_name}") from exc
+        if not file_bytes:
+            raise ValueError(f"Uploaded file is empty: {file_name}")
+        total_bytes += len(file_bytes)
+        if total_bytes > MAX_AGENT_BUNDLE_BYTES:
+            raise ValueError("Uploaded file set is too large for the MVP limit (20 MB).")
+        source_files.append(
+            AnnouncementSourceFile(
+                file_name=file_name,
+                file_bytes=file_bytes,
+                relative_path=relative_path,
+            )
+        )
+        file_items.append(
+            {
+                "file_name": file_name,
+                "relative_path": relative_path,
+                "file_bytes": file_bytes,
+                "size_bytes": len(file_bytes),
+            }
+        )
+
+    notice_file = _select_notice_pdf(file_items)
+    notice_text = str(notice_file.get("extracted_text") or "")
+    if not notice_text:
+        notice_text = extract_text_from_document(
+            str(notice_file["file_name"]), bytes(notice_file["file_bytes"])
+        )
+        notice_file["extracted_text"] = notice_text
+    workflow_result = run_announcement_analysis(
+        DocumentWorkflowRequest(
+            profile_name=profile_name,
+            file_name=str(notice_file["file_name"]),
+            extracted_text=notice_text,
+            system_prompt=system_prompt,
+            instruction=instruction,
+            team_context=team_context,
+        ),
+        cwd=str(REPO_ROOT),
+    )
+    rag_status = _index_document_for_rag(
+        chat_profile_name=profile_name,
+        file_name=str(notice_file["file_name"]),
+        extracted_text=notice_text,
+        instruction=instruction,
+        team_context=team_context,
+        structured_analysis=workflow_result.structured,
+        system_prompt=system_prompt,
+    )
+    store = RagStore.for_project(REPO_ROOT)
+    document_id = int(rag_status["indexed_document_id"])
+    structured = _structured_with_rag_metadata(
+        workflow_result.structured,
+        store.get_document_metadata(document_id),
+    )
+    store.upsert_document_artifact(
+        document_id,
+        extracted_text=notice_text,
+        summary=workflow_result.summary,
+        structured=structured,
+        workflow_name=workflow_result.workflow_name,
+        prompt_source_truncated=workflow_result.prompt_source_truncated,
+    )
+    proposal_ops = build_proposal_ops_preview(
+        ProposalOpsRequest(
+            file_name=str(notice_file["file_name"]),
+            structured_analysis=structured,
+            instruction=instruction,
+            team_context=team_context,
+        )
+    )
+    announcement_agent = run_announcement_agent(
+        AnnouncementAgentRequest(
+            file_name=str(notice_file["file_name"]),
+            file_bytes=bytes(notice_file["file_bytes"]),
+            source_files=source_files,
+            structured_analysis=structured,
+            instruction=instruction,
+            team_context=team_context,
+        )
+    )
+    return {
+        "profile": profile_name,
+        "file_count": len(source_files),
+        "primary_file_name": str(notice_file["file_name"]),
+        "primary_relative_path": str(notice_file["relative_path"]),
+        "workflow": workflow_result.workflow_name,
+        "summary": workflow_result.summary,
+        "structured": structured,
+        "proposal_ops": proposal_ops,
+        "announcement_agent": announcement_agent,
+        "summary_source_truncated": workflow_result.prompt_source_truncated,
+        "rag": rag_status,
+        "rag_indexing_results": [rag_status],
+        "attachment_files": _attachment_file_payload(file_items, notice_file),
+    }
+
+
+def _select_notice_pdf(file_items: list[dict[str, Any]]) -> dict[str, Any]:
+    pdf_files = [
+        item
+        for item in file_items
+        if str(item.get("file_name", "")).lower().endswith(".pdf")
+    ]
+    if not pdf_files:
+        raise ValueError("업로드 폴더에는 분석 대상인 PDF 공고 파일이 반드시 포함되어야 합니다.")
+
+    file_name_matches = [
+        item for item in pdf_files if "공고" in str(item.get("file_name", ""))
+    ]
+    if file_name_matches:
+        return file_name_matches[0]
+
+    for item in pdf_files:
+        extracted_text = extract_text_from_document(
+            str(item["file_name"]), bytes(item["file_bytes"])
+        )
+        item["extracted_text"] = extracted_text
+        if "공고" in extracted_text[:4000]:
+            return item
+
+    raise ValueError(
+        "PDF 파일은 찾았지만 `공고`로 식별되는 파일이 없습니다. 파일명 또는 본문에 `공고`가 포함된 PDF를 함께 업로드하세요."
+    )
+
+
+def _attachment_file_payload(
+    file_items: list[dict[str, Any]], notice_file: dict[str, Any]
+) -> list[dict[str, Any]]:
+    notice_relative_path = str(notice_file.get("relative_path", ""))
+    return [
+        {
+            "file_name": str(item.get("file_name", "")),
+            "relative_path": str(item.get("relative_path", "")),
+            "extension": Path(str(item.get("file_name", ""))).suffix.lower(),
+            "size_bytes": int(item.get("size_bytes", 0)),
+            "role": "notice_pdf"
+            if str(item.get("relative_path", "")) == notice_relative_path
+            else "attachment",
+            "indexed": str(item.get("relative_path", "")) == notice_relative_path,
+        }
+        for item in file_items
+    ]
+
+
+def _structured_with_rag_metadata(
+    structured: dict[str, Any], metadata: dict[str, object]
+) -> dict[str, Any]:
+    payload = dict(structured)
+    existing_metadata = payload.get("metadata") if isinstance(payload.get("metadata"), dict) else {}
+    merged_metadata = dict(existing_metadata)
+    for key in (
+        "ministry",
+        "agency",
+        "business_type",
+        "rd_or_non_rd",
+        "program_name",
+        "submission_deadline",
+    ):
+        value = str(metadata.get(key, "")).strip()
+        if value and not merged_metadata.get(key):
+            merged_metadata[key] = value
+    if merged_metadata:
+        payload["metadata"] = merged_metadata
+    return payload
+
+
 def _list_rag_documents() -> dict[str, Any]:
     store = RagStore.for_project(REPO_ROOT)
     return {
@@ -605,6 +826,12 @@ class WebMvpHandler(SimpleHTTPRequestHandler):
         if self.path == "/api/process-document":
             self._handle_document_request()
             return
+        if self.path == "/api/announcement-agent/run":
+            self._handle_announcement_agent_request()
+            return
+        if self.path == "/api/announcement-agent/feedback":
+            self._handle_announcement_agent_feedback_request()
+            return
         if self.path == "/api/project-context":
             self._handle_project_context_request()
             return
@@ -680,6 +907,56 @@ class WebMvpHandler(SimpleHTTPRequestHandler):
             return
         except RuntimeError as exc:
             self._send_json(HTTPStatus.BAD_GATEWAY, {"error": str(exc)})
+            return
+        except Exception as exc:  # pragma: no cover - defensive endpoint guard
+            self._send_json(HTTPStatus.INTERNAL_SERVER_ERROR, {"error": str(exc)})
+            return
+
+        self._send_json(HTTPStatus.OK, result)
+
+    def _handle_announcement_agent_request(self) -> None:
+        payload = self._read_json_body()
+        if payload is None:
+            return
+
+        try:
+            profile_name = str(payload.get("profile", "")).strip()
+            files = payload.get("files", [])
+            instruction = str(payload.get("instruction", "")).strip()
+            team_context = str(payload.get("team_context", "")).strip()
+            system_prompt = str(payload.get("system_prompt", "")).strip()
+            if not profile_name:
+                raise ValueError("`profile` is required.")
+            if not isinstance(files, list):
+                raise ValueError("`files` must be a list.")
+            result = _run_announcement_agent_bundle(
+                profile_name=profile_name,
+                files=files,
+                instruction=instruction,
+                team_context=team_context,
+                system_prompt=system_prompt,
+            )
+        except ValueError as exc:
+            self._send_json(HTTPStatus.BAD_REQUEST, {"error": str(exc)})
+            return
+        except RuntimeError as exc:
+            self._send_json(HTTPStatus.BAD_GATEWAY, {"error": str(exc)})
+            return
+        except Exception as exc:  # pragma: no cover - defensive endpoint guard
+            self._send_json(HTTPStatus.INTERNAL_SERVER_ERROR, {"error": str(exc)})
+            return
+
+        self._send_json(HTTPStatus.OK, result)
+
+    def _handle_announcement_agent_feedback_request(self) -> None:
+        payload = self._read_json_body()
+        if payload is None:
+            return
+
+        try:
+            result = _save_announcement_agent_feedback(payload)
+        except ValueError as exc:
+            self._send_json(HTTPStatus.BAD_REQUEST, {"error": str(exc)})
             return
         except Exception as exc:  # pragma: no cover - defensive endpoint guard
             self._send_json(HTTPStatus.INTERNAL_SERVER_ERROR, {"error": str(exc)})

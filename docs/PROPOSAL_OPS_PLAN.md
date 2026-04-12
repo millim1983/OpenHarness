@@ -49,6 +49,7 @@ Current navigation:
 - Chat
 - Document Pipeline
 - Proposal Ops
+- 공고 에이전트
 
 ## Announcement Agent First Automation Target
 
@@ -56,18 +57,31 @@ The announcement agent handles discovered/uploaded notices regardless of final g
 
 Initial behavior:
 
-1. Process the uploaded notice through the document/RAG path.
-2. Extract structured announcement information from the notice.
-3. Create a project folder under the configured proposal output root.
-4. Use folder naming rule: `yymmdd-전문기관약자 또는 전문기관명-사업명`.
-5. Save the uploaded source file under `00_공고_원문`.
-6. Create `총괄장.xlsx` with tabs:
+1. Process the uploaded notice/file set through the document/RAG path.
+2. Find the PDF notice file whose file name or extracted text contains `공고`.
+3. Extract structured announcement information from that PDF notice file only.
+4. Create a project folder under the configured announcement/proposal output root.
+5. Use folder naming rule: `yymmdd-전문기관약자 또는 전문기관명-사업명`.
+6. Save the uploaded source file set under the generated project folder while preserving relative paths.
+7. Create `총괄장.xlsx` directly in the generated project folder with tabs:
    - `사업개요`
    - `문의처`
    - `접수`
    - `제출서류`
    - `컨소시엄`
-7. Create/update `공고_모니터링.xlsx` at the output root.
+8. Create/update `공고리스트.json` and regenerate `공고리스트_yyyymmdd.xlsx` at the output root.
+9. Add a dashboard sheet and UI summary for daily upload count, ministry, business type, and LLM-classified business domain.
+
+Attachment handling:
+
+- Only the selected PDF notice is extracted, structurally analyzed, and indexed into RAG.
+- HWP, Excel, PowerPoint, forms, manuals, and regulation attachments are not parsed in the announcement-agent execution path.
+- Those attachments are saved as original files and listed in `첨부파일목록.json` inside the generated announcement folder for later review.
+
+Important boundary:
+
+- Announcement stage does not create the proposal submission folder tree.
+- The folder tree in `proposal_assets/config/folder_tree.json` is reserved for the later proposal-drive stage after the user decides to start a proposal.
 
 Current output root:
 
@@ -76,8 +90,8 @@ Current output root:
 
 Current limitation:
 
-- Multi-file folder upload and folder monitoring are not implemented yet.
-- The first pass saves the uploaded file and generates workbooks for the analyzed notice.
+- Browser folder upload requires the user to choose a local folder in the web UI and click Run.
+- The first pass saves the uploaded file set and generates workbooks for the analyzed notice bundle.
 - Monitoring workbook updates are implemented by regenerating the workbook from a JSON sidecar.
 
 ## Agency Alias Rule
@@ -102,7 +116,7 @@ Proposal automation settings are separated from code under `proposal_assets/conf
 - `agency_aliases.json`: 전문기관/전담기관/발주처 alias dictionary.
 - `feature_flags.json`: feature on-off switches.
 - `folder_rules.json`: folder naming rule and source-field priority.
-- `folder_tree.json`: generated project folder tree.
+- `folder_tree.json`: proposal-stage folder tree, applied later when a discovered notice moves into proposal execution.
 - `role_book.json`: role labels and default owners.
 - `workflow_process.json`: proposal submission stages, automation types, and safety rules.
 

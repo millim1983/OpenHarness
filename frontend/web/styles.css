@@ -283,7 +283,8 @@ textarea {
   box-shadow: var(--shadow);
 }
 
-.proposal-ops-panel {
+.proposal-ops-panel,
+.announcement-agent-panel {
   padding: 18px;
   border-radius: var(--radius);
   background: var(--surface);
@@ -291,7 +292,8 @@ textarea {
   box-shadow: var(--shadow);
 }
 
-.proposal-agent-meta {
+.proposal-agent-meta,
+.announcement-agent-meta {
   margin: 12px 0;
   padding: 12px;
   border: 1px solid var(--line);
@@ -302,6 +304,17 @@ textarea {
   line-height: 1.5;
   white-space: pre-wrap;
   overflow-wrap: anywhere;
+}
+
+.announcement-results {
+  display: grid;
+  gap: 16px;
+  grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+  margin-top: 14px;
+}
+
+.announcement-results .response-panel {
+  margin-top: 0;
 }
 
 .rag-stats,
@@ -439,6 +452,7 @@ pre {
   .response-header,
   .actions,
   .document-results,
+  .announcement-results,
   .rag-filter-grid,
   .rag-document-item,
   .ingestion-review-item {
@@ -460,7 +474,8 @@ pre {
     display: flex;
   }
 
-  .document-results {
+  .document-results,
+  .announcement-results {
     display: flex;
   }
 }
