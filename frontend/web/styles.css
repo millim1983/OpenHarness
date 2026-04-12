@@ -283,6 +283,14 @@ textarea {
   box-shadow: var(--shadow);
 }
 
+.proposal-ops-panel {
+  padding: 18px;
+  border-radius: var(--radius);
+  background: var(--surface);
+  border: 1px solid var(--line);
+  box-shadow: var(--shadow);
+}
+
 .rag-stats,
 .rag-db-path,
 .ingestion-stats {

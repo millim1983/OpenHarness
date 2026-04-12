@@ -239,6 +239,8 @@ def test_run_document_summary_stores_detail_artifact(tmp_path: Path, monkeypatch
     assert detail["structured"]["internal_execution_plan"]["immediate_next_actions"] == [
         "Call owner"
     ]
+    assert result["proposal_ops"]["project_summary"]["title"] == "Stored notice"
+    assert "folder_plan" in result["proposal_ops"]
 
 
 def test_ingestion_state_and_review_update_helpers(tmp_path: Path, monkeypatch) -> None:

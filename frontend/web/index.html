@@ -201,11 +201,25 @@
           </div>
         </section>
           </section>
+
+          <section id="proposalOpsView" class="workspace-view" data-view="proposal-ops">
+            <section class="proposal-ops-panel">
+              <div class="response-header">
+                <h2>Proposal Operations</h2>
+                <button id="copyProposalOpsButton" class="ghost-button" type="button">Copy</button>
+              </div>
+              <p class="helper-text">
+                Upload and analyze a notice in Document Pipeline, then review the operations plan here before any execution.
+              </p>
+              <pre id="proposalOpsOutput">No proposal operations plan yet.</pre>
+            </section>
+          </section>
         </section>
 
         <aside class="nav-panel" aria-label="Workspace navigation">
           <button class="nav-button is-active" type="button" data-target-view="chat">Chat</button>
           <button class="nav-button" type="button" data-target-view="documents">Document Pipeline</button>
+          <button class="nav-button" type="button" data-target-view="proposal-ops">Proposal Ops</button>
         </aside>
       </div>
     </main>

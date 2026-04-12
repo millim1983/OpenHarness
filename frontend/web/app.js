@@ -35,6 +35,8 @@ const ingestionStats = document.querySelector("#ingestionStats");
 const ingestionReviewList = document.querySelector("#ingestionReviewList");
 const navButtons = Array.from(document.querySelectorAll(".nav-button[data-target-view]"));
 const workspaceViews = Array.from(document.querySelectorAll(".workspace-view[data-view]"));
+const proposalOpsOutput = document.querySelector("#proposalOpsOutput");
+const copyProposalOpsButton = document.querySelector("#copyProposalOpsButton");
 
 async function loadProfiles() {
   setStatus("Loading profiles...");
@@ -445,6 +447,62 @@ function formatRagStatus(rag) {
   return rag.reason || "RAG not used yet.";
 }
 
+function formatProposalOpsPlan(plan) {
+  if (!plan || typeof plan !== "object") {
+    return "No proposal operations plan yet.";
+  }
+  const summary = plan.project_summary || {};
+  const lines = [];
+  lines.push("Project summary");
+  lines.push(`- Title: ${summary.title || "Unknown"}`);
+  lines.push(`- Source file: ${summary.source_file || "Unknown"}`);
+  lines.push(`- Project type: ${summary.project_type || "Unknown"}`);
+  lines.push(`- Business type: ${summary.business_type || "Unknown"}`);
+  lines.push(`- Submission deadline: ${summary.submission_deadline || "Needs review"}`);
+  lines.push(`- Submission channel: ${summary.submission_channel || "Needs review"}`);
+
+  appendObjectList(lines, "Submission checklist", plan.submission_checklist, (item) =>
+    `- [${item.status || "needs_review"}] ${item.item || "Unnamed item"} | owner: ${item.owner || "Unassigned"}${item.basis ? ` | basis: ${item.basis}` : ""}`
+  );
+  appendObjectList(lines, "Manager questions", plan.manager_questions, (item) =>
+    `- ${item.question || "Unspecified question"} | target: ${item.target || "Unassigned"} | reason: ${item.reason || "review"}`
+  );
+  appendObjectList(lines, "Role tasks", plan.role_tasks, (item) => {
+    const tasks = Array.isArray(item.tasks) ? item.tasks.join("; ") : "No tasks listed";
+    return `- ${item.role || "Role"} / ${item.owner || "Unassigned"}: ${tasks}${item.manager_plus_one ? ` | +1: ${item.manager_plus_one}` : ""}`;
+  });
+  appendObjectList(lines, "Reminder plan", plan.reminder_plan, (item) =>
+    `- ${item.phase || "phase"}: ${item.cadence || "cadence"} | ${item.target || "target"} | ${item.condition || "condition"}`
+  );
+  appendTextList(lines, "Folder plan", plan.folder_plan);
+  appendTextList(lines, "File output plan", plan.file_plan);
+  appendTextList(lines, "Execution preview", plan.execution_preview);
+  appendTextList(lines, "Manual inputs still needed", plan.needs_manual_inputs);
+  return lines.join("\n").trim();
+}
+
+function appendObjectList(lines, title, items, formatter) {
+  if (!Array.isArray(items) || items.length === 0) {
+    return;
+  }
+  lines.push("");
+  lines.push(title);
+  for (const item of items) {
+    lines.push(formatter(item || {}));
+  }
+}
+
+function appendTextList(lines, title, items) {
+  if (!Array.isArray(items) || items.length === 0) {
+    return;
+  }
+  lines.push("");
+  lines.push(title);
+  for (const item of items) {
+    lines.push(`- ${item}`);
+  }
+}
+
 function collectRagFilters() {
   const filters = {
     document_type: ragFilterDocumentType.value.trim(),
@@ -815,6 +873,7 @@ async function processDocument() {
     documentSummaryOutput.textContent = payload.summary || "(empty summary)";
     documentStructuredOutput.textContent = formatStructuredInsights(payload.structured);
     documentExecutionOutput.textContent = formatExecutionPlan(payload.structured);
+    proposalOpsOutput.textContent = formatProposalOpsPlan(payload.proposal_ops);
     renderRagDocuments(payload.rag || {});
     await loadIngestionState();
     setStatus(`Document processed with ${payload.profile}. ${formatRagStatus(payload.rag)}`);
@@ -950,6 +1009,14 @@ copyExecutionButton.addEventListener("click", () => {
     documentExecutionOutput.textContent,
     "No internal execution plan yet.",
     "Internal execution plan copied."
+  );
+});
+
+copyProposalOpsButton.addEventListener("click", () => {
+  void copyText(
+    proposalOpsOutput.textContent,
+    "No proposal operations plan yet.",
+    "Proposal operations plan copied."
   );
 });
 

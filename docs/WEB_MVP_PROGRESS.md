@@ -585,6 +585,41 @@ Next plan:
 - Run the browser UI and manually check chat/document navigation plus ingestion review actions.
 - Add the first web agent endpoint after the RAG tool contract is stable.
 - Consider adding `rag_index_document` as a write tool only after user approval semantics are clearer.
+
+## 2026-04-12 Proposal Ops Preview UI
+
+Developed:
+- Added `docs/DEVELOPMENT_JOURNAL.md` as a date-based work log.
+- Added `docs/PROPOSAL_OPS_PLAN.md` as the feature plan for proposal operations automation.
+- Added `src/openharness/services/workflows/proposal_ops.py` to build a deterministic operations preview from announcement analysis output.
+- Added `proposal_ops` to the document upload response payload.
+- Added a separate `Proposal Ops` web workspace. It is intentionally separate from `Document Pipeline`.
+- Added right-side navigation entries for `Chat`, `Document Pipeline`, and `Proposal Ops`.
+
+Current Proposal Ops preview includes:
+- Project summary.
+- Submission checklist.
+- Manager questions.
+- Role tasks.
+- Reminder plan.
+- Folder plan.
+- File output plan.
+- Execution preview.
+- Manual inputs still needed.
+
+Verified:
+- `.venv/bin/python -m pytest tests/test_services/test_proposal_ops_workflow.py tests/test_services/test_web_mvp_rag.py tests/test_tools/test_rag_tools.py tests/test_services/test_ingestion_pipeline.py tests/test_services/test_rag_core.py tests/test_services/test_web_runtime.py tests/test_services/test_rag_metadata.py tests/test_services/test_document_processing.py tests/test_services/test_announcement_workflow.py tests/test_services/test_compact.py`
+- Result: 33 passed in 2.29s.
+- `.venv/bin/python -m ruff check src/openharness/services src/openharness/tools scripts/web_mvp_server.py tests/test_services tests/test_tools`
+- Result: All checks passed.
+- `/home/kiakiakia/.vscode-server/bin/07ff9d6178ede9a1bd12ad3399074d726ebe6e43/node --check frontend/web/app.js`
+- Result: passed.
+- Review server started at `http://127.0.0.1:8012`.
+- HTML smoke check confirmed the page includes `Proposal Ops` and `Document Pipeline`.
+
+Next plan:
+- Add persistence for proposal projects/tasks/questions instead of only returning preview payloads.
+- Add a preview/approve/execute boundary before any folder creation, file moves, file writes, or message sends.
 - `.venv/bin/python -m ruff check src/openharness/services/rag_types.py src/openharness/services/rag_retrieval.py src/openharness/services/rag_metadata.py scripts/web_mvp_server.py tests/test_services/test_rag_core.py tests/test_services/test_web_mvp_rag.py`
 - `/home/kiakiakia/.vscode-server/bin/07ff9d6178ede9a1bd12ad3399074d726ebe6e43/node --check frontend/web/app.js`
 - Real Web MVP smoke test on `http://127.0.0.1:8010` with `openai-compatible`:

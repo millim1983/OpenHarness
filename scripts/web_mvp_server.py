@@ -26,7 +26,12 @@ from openharness.services.rag_retrieval import build_retrieval_context, retrieve
 from openharness.services.rag_store import RagStore
 from openharness.services.rag_types import ChunkRecord, RagRetrievalFilters
 from openharness.services.web_runtime import run_single_prompt_sync
-from openharness.services.workflows import DocumentWorkflowRequest, run_announcement_analysis
+from openharness.services.workflows import (
+    DocumentWorkflowRequest,
+    ProposalOpsRequest,
+    build_proposal_ops_preview,
+    run_announcement_analysis,
+)
 
 
 REPO_ROOT = Path(__file__).resolve().parents[1]
@@ -335,6 +340,14 @@ def _run_document_summary(
         workflow_name=workflow_result.workflow_name,
         prompt_source_truncated=workflow_result.prompt_source_truncated,
     )
+    proposal_ops = build_proposal_ops_preview(
+        ProposalOpsRequest(
+            file_name=filename,
+            structured_analysis=workflow_result.structured,
+            instruction=instruction,
+            team_context=team_context,
+        )
+    )
     return {
         "profile": profile_name,
         "file_name": filename,
@@ -343,6 +356,7 @@ def _run_document_summary(
         "workflow": workflow_result.workflow_name,
         "summary": workflow_result.summary,
         "structured": workflow_result.structured,
+        "proposal_ops": proposal_ops,
         "summary_source_truncated": workflow_result.prompt_source_truncated,
         "rag": rag_status,
     }
