@@ -1,6 +1,6 @@
 # Latest Handoff
 
-Updated: 2026-04-13 02:49 KST
+Updated: 2026-04-13 02:55 KST
 
 ## GitHub
 
@@ -56,6 +56,12 @@ Important distinction:
 - The server cannot directly create folders or move files inside the user's original local PC folder chosen by the browser.
 - If a company shared drive is mounted on the Ubuntu server, the program can create folders and move files there.
 - A future watched-folder mode can support true server-side file movement from an intake folder into the generated announcement folder.
+
+Short rule:
+
+- User-selected browser folder = source for uploading files.
+- Preconfigured server folder = destination where the program creates folders and output files.
+- Server-mounted shared drive folder = location where the program can later watch and truly move files.
 
 ## Network Notes
 
