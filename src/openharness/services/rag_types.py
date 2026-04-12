@@ -69,6 +69,67 @@ class RetrievedChunk:
     business_type: str = ""
 
 
+@dataclass(frozen=True)
+class IngestionSource:
+    """User-connected source for future batch ingestion."""
+
+    id: int
+    source_type: str
+    name: str
+    location: str
+    enabled: bool
+    schedule: str
+    scope_json: dict[str, object] = field(default_factory=dict)
+    created_at: str = ""
+    updated_at: str = ""
+
+
+@dataclass(frozen=True)
+class IngestionPlan:
+    """User-visible plan controlling scope and batch behavior."""
+
+    id: int
+    source_id: int
+    name: str
+    status: str
+    batch_size: int
+    schedule: str
+    scope_json: dict[str, object] = field(default_factory=dict)
+    created_at: str = ""
+    updated_at: str = ""
+
+
+@dataclass(frozen=True)
+class IngestionJob:
+    """One scheduled or manually triggered ingestion batch."""
+
+    id: int
+    plan_id: int
+    status: str
+    requested_limit: int
+    processed_count: int
+    error_message: str
+    created_at: str = ""
+    updated_at: str = ""
+
+
+@dataclass(frozen=True)
+class IngestionReviewItem:
+    """Review status for an indexed or failed ingestion item."""
+
+    id: int
+    source_id: int
+    document_id: int | None
+    source_uri: str
+    file_name: str
+    content_hash: str
+    review_status: str
+    quality_score: float | None = None
+    notes: str = ""
+    created_at: str = ""
+    updated_at: str = ""
+
+
 class EmbeddingBackend(Protocol):
     """Backend interface used by indexing and retrieval services."""
 

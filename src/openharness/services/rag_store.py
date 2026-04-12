@@ -7,7 +7,14 @@ import sqlite3
 from pathlib import Path
 
 from openharness.config.paths import get_project_rag_db_path
-from openharness.services.rag_types import ChunkRecord, IndexedDocument
+from openharness.services.rag_types import (
+    ChunkRecord,
+    IndexedDocument,
+    IngestionJob,
+    IngestionPlan,
+    IngestionReviewItem,
+    IngestionSource,
+)
 
 
 SCHEMA = """
@@ -42,6 +49,57 @@ CREATE TABLE IF NOT EXISTS document_artifacts (
     prompt_source_truncated INTEGER NOT NULL DEFAULT 0,
     updated_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
 );
+
+CREATE TABLE IF NOT EXISTS ingestion_sources (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    source_type TEXT NOT NULL,
+    name TEXT NOT NULL,
+    location TEXT NOT NULL,
+    enabled INTEGER NOT NULL DEFAULT 1,
+    schedule TEXT NOT NULL DEFAULT '',
+    scope_json TEXT NOT NULL DEFAULT '{}',
+    created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    updated_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    UNIQUE(source_type, location)
+);
+
+CREATE TABLE IF NOT EXISTS ingestion_plans (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    source_id INTEGER NOT NULL REFERENCES ingestion_sources(id) ON DELETE CASCADE,
+    name TEXT NOT NULL,
+    status TEXT NOT NULL DEFAULT 'draft',
+    batch_size INTEGER NOT NULL DEFAULT 10,
+    schedule TEXT NOT NULL DEFAULT '',
+    scope_json TEXT NOT NULL DEFAULT '{}',
+    created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    updated_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
+);
+
+CREATE TABLE IF NOT EXISTS ingestion_jobs (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    plan_id INTEGER NOT NULL REFERENCES ingestion_plans(id) ON DELETE CASCADE,
+    status TEXT NOT NULL DEFAULT 'queued',
+    requested_limit INTEGER NOT NULL DEFAULT 0,
+    processed_count INTEGER NOT NULL DEFAULT 0,
+    error_message TEXT NOT NULL DEFAULT '',
+    created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    updated_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
+);
+
+CREATE TABLE IF NOT EXISTS ingestion_review_items (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    source_id INTEGER NOT NULL REFERENCES ingestion_sources(id) ON DELETE CASCADE,
+    document_id INTEGER REFERENCES documents(id) ON DELETE SET NULL,
+    source_uri TEXT NOT NULL,
+    file_name TEXT NOT NULL,
+    content_hash TEXT NOT NULL,
+    review_status TEXT NOT NULL DEFAULT 'needs_review',
+    quality_score REAL,
+    notes TEXT NOT NULL DEFAULT '',
+    created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    updated_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    UNIQUE(source_id, source_uri, content_hash)
+);
 """
 
 
@@ -72,6 +130,267 @@ class RagStore:
     def _initialize(self) -> None:
         with self._connect() as connection:
             connection.executescript(SCHEMA)
+
+    def upsert_ingestion_source(
+        self,
+        *,
+        source_type: str,
+        name: str,
+        location: str,
+        enabled: bool = True,
+        schedule: str = "",
+        scope: dict[str, object] | None = None,
+    ) -> int:
+        """Insert or update one ingestion source."""
+        payload = json.dumps(scope or {}, ensure_ascii=True, sort_keys=True)
+        with self._connect() as connection:
+            cursor = connection.execute(
+                """
+                INSERT INTO ingestion_sources (
+                    source_type, name, location, enabled, schedule, scope_json, updated_at
+                )
+                VALUES (?, ?, ?, ?, ?, ?, CURRENT_TIMESTAMP)
+                ON CONFLICT(source_type, location) DO UPDATE SET
+                    name = excluded.name,
+                    enabled = excluded.enabled,
+                    schedule = excluded.schedule,
+                    scope_json = excluded.scope_json,
+                    updated_at = CURRENT_TIMESTAMP
+                RETURNING id
+                """,
+                (source_type, name, location, 1 if enabled else 0, schedule, payload),
+            )
+            return int(cursor.fetchone()["id"])
+
+    def list_ingestion_sources(self) -> list[IngestionSource]:
+        """Return configured ingestion sources."""
+        with self._connect() as connection:
+            rows = connection.execute(
+                """
+                SELECT id, source_type, name, location, enabled, schedule, scope_json,
+                       created_at, updated_at
+                FROM ingestion_sources
+                ORDER BY updated_at DESC, id DESC
+                """
+            ).fetchall()
+        return [
+            IngestionSource(
+                id=int(row["id"]),
+                source_type=str(row["source_type"]),
+                name=str(row["name"]),
+                location=str(row["location"]),
+                enabled=bool(row["enabled"]),
+                schedule=str(row["schedule"]),
+                scope_json=json.loads(str(row["scope_json"])),
+                created_at=str(row["created_at"]),
+                updated_at=str(row["updated_at"]),
+            )
+            for row in rows
+        ]
+
+    def create_ingestion_plan(
+        self,
+        *,
+        source_id: int,
+        name: str,
+        status: str = "draft",
+        batch_size: int = 10,
+        schedule: str = "",
+        scope: dict[str, object] | None = None,
+    ) -> int:
+        """Create an ingestion plan shell for a source."""
+        payload = json.dumps(scope or {}, ensure_ascii=True, sort_keys=True)
+        with self._connect() as connection:
+            exists = connection.execute(
+                "SELECT 1 FROM ingestion_sources WHERE id = ?",
+                (source_id,),
+            ).fetchone()
+            if exists is None:
+                raise ValueError(f"Unknown ingestion source id: {source_id}")
+            cursor = connection.execute(
+                """
+                INSERT INTO ingestion_plans (
+                    source_id, name, status, batch_size, schedule, scope_json
+                )
+                VALUES (?, ?, ?, ?, ?, ?)
+                """,
+                (source_id, name, status, batch_size, schedule, payload),
+            )
+            return int(cursor.lastrowid)
+
+    def list_ingestion_plans(self) -> list[IngestionPlan]:
+        """Return ingestion plan shells."""
+        with self._connect() as connection:
+            rows = connection.execute(
+                """
+                SELECT id, source_id, name, status, batch_size, schedule, scope_json,
+                       created_at, updated_at
+                FROM ingestion_plans
+                ORDER BY updated_at DESC, id DESC
+                """
+            ).fetchall()
+        return [
+            IngestionPlan(
+                id=int(row["id"]),
+                source_id=int(row["source_id"]),
+                name=str(row["name"]),
+                status=str(row["status"]),
+                batch_size=int(row["batch_size"]),
+                schedule=str(row["schedule"]),
+                scope_json=json.loads(str(row["scope_json"])),
+                created_at=str(row["created_at"]),
+                updated_at=str(row["updated_at"]),
+            )
+            for row in rows
+        ]
+
+    def create_ingestion_job(
+        self,
+        *,
+        plan_id: int,
+        status: str = "queued",
+        requested_limit: int = 0,
+        processed_count: int = 0,
+        error_message: str = "",
+    ) -> int:
+        """Create one ingestion batch job record."""
+        with self._connect() as connection:
+            exists = connection.execute(
+                "SELECT 1 FROM ingestion_plans WHERE id = ?",
+                (plan_id,),
+            ).fetchone()
+            if exists is None:
+                raise ValueError(f"Unknown ingestion plan id: {plan_id}")
+            cursor = connection.execute(
+                """
+                INSERT INTO ingestion_jobs (
+                    plan_id, status, requested_limit, processed_count, error_message
+                )
+                VALUES (?, ?, ?, ?, ?)
+                """,
+                (plan_id, status, requested_limit, processed_count, error_message),
+            )
+            return int(cursor.lastrowid)
+
+    def list_ingestion_jobs(self) -> list[IngestionJob]:
+        """Return ingestion job records."""
+        with self._connect() as connection:
+            rows = connection.execute(
+                """
+                SELECT id, plan_id, status, requested_limit, processed_count, error_message,
+                       created_at, updated_at
+                FROM ingestion_jobs
+                ORDER BY updated_at DESC, id DESC
+                """
+            ).fetchall()
+        return [
+            IngestionJob(
+                id=int(row["id"]),
+                plan_id=int(row["plan_id"]),
+                status=str(row["status"]),
+                requested_limit=int(row["requested_limit"]),
+                processed_count=int(row["processed_count"]),
+                error_message=str(row["error_message"]),
+                created_at=str(row["created_at"]),
+                updated_at=str(row["updated_at"]),
+            )
+            for row in rows
+        ]
+
+    def upsert_ingestion_review_item(
+        self,
+        *,
+        source_id: int,
+        source_uri: str,
+        file_name: str,
+        content_hash: str,
+        document_id: int | None = None,
+        review_status: str = "needs_review",
+        quality_score: float | None = None,
+        notes: str = "",
+    ) -> int:
+        """Insert or update one review item for an ingested source item."""
+        with self._connect() as connection:
+            exists = connection.execute(
+                "SELECT 1 FROM ingestion_sources WHERE id = ?",
+                (source_id,),
+            ).fetchone()
+            if exists is None:
+                raise ValueError(f"Unknown ingestion source id: {source_id}")
+            cursor = connection.execute(
+                """
+                INSERT INTO ingestion_review_items (
+                    source_id, document_id, source_uri, file_name, content_hash,
+                    review_status, quality_score, notes, updated_at
+                )
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, CURRENT_TIMESTAMP)
+                ON CONFLICT(source_id, source_uri, content_hash) DO UPDATE SET
+                    document_id = excluded.document_id,
+                    file_name = excluded.file_name,
+                    review_status = excluded.review_status,
+                    quality_score = excluded.quality_score,
+                    notes = excluded.notes,
+                    updated_at = CURRENT_TIMESTAMP
+                RETURNING id
+                """,
+                (
+                    source_id,
+                    document_id,
+                    source_uri,
+                    file_name,
+                    content_hash,
+                    review_status,
+                    quality_score,
+                    notes,
+                ),
+            )
+            return int(cursor.fetchone()["id"])
+
+    def list_ingestion_review_items(self) -> list[IngestionReviewItem]:
+        """Return ingestion review records."""
+        with self._connect() as connection:
+            rows = connection.execute(
+                """
+                SELECT id, source_id, document_id, source_uri, file_name, content_hash,
+                       review_status, quality_score, notes, created_at, updated_at
+                FROM ingestion_review_items
+                ORDER BY updated_at DESC, id DESC
+                """
+            ).fetchall()
+        return [
+            IngestionReviewItem(
+                id=int(row["id"]),
+                source_id=int(row["source_id"]),
+                document_id=int(row["document_id"]) if row["document_id"] is not None else None,
+                source_uri=str(row["source_uri"]),
+                file_name=str(row["file_name"]),
+                content_hash=str(row["content_hash"]),
+                review_status=str(row["review_status"]),
+                quality_score=(
+                    float(row["quality_score"]) if row["quality_score"] is not None else None
+                ),
+                notes=str(row["notes"]),
+                created_at=str(row["created_at"]),
+                updated_at=str(row["updated_at"]),
+            )
+            for row in rows
+        ]
+
+    def update_ingestion_review_status(
+        self, review_item_id: int, *, review_status: str, notes: str = ""
+    ) -> None:
+        """Update review status for one ingestion item."""
+        with self._connect() as connection:
+            cursor = connection.execute(
+                """
+                UPDATE ingestion_review_items
+                SET review_status = ?, notes = ?, updated_at = CURRENT_TIMESTAMP
+                WHERE id = ?
+                """,
+                (review_status, notes, review_item_id),
+            )
+            if cursor.rowcount == 0:
+                raise ValueError(f"Unknown ingestion review item id: {review_item_id}")
 
     def upsert_document(
         self, file_name: str, content_hash: str, metadata: dict[str, object] | None = None

@@ -6,6 +6,7 @@ import base64
 import json
 import os
 import sys
+from hashlib import sha1
 from http import HTTPStatus
 from http.server import SimpleHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
@@ -173,6 +174,7 @@ def _index_document_for_rag(
         embedding_profile_name, settings=settings
     )
     store = RagStore.for_project(REPO_ROOT)
+    content_hash = sha1(extracted_text.encode("utf-8")).hexdigest()
     document_id = index_document(
         cwd=str(REPO_ROOT),
         file_name=file_name,
@@ -190,10 +192,28 @@ def _index_document_for_rag(
             structured_analysis=structured_analysis,
         ),
     )
+    source_id = store.upsert_ingestion_source(
+        source_type="upload",
+        name="Web MVP uploads",
+        location="web_mvp_uploads",
+        schedule="manual",
+        scope={"accepted_file": file_name},
+    )
+    review_item_id = store.upsert_ingestion_review_item(
+        source_id=source_id,
+        document_id=document_id,
+        source_uri=f"upload://{file_name}",
+        file_name=file_name,
+        content_hash=content_hash,
+        review_status="needs_review",
+        notes="Created from Web MVP document upload.",
+    )
     return {
         "enabled": True,
         "embedding_profile": embedding_profile_name,
         "indexed_document_id": document_id,
+        "ingestion_source_id": source_id,
+        "ingestion_review_item_id": review_item_id,
         **_document_rag_status(store),
     }
 
@@ -358,6 +378,101 @@ def _list_rag_documents() -> dict[str, Any]:
     }
 
 
+def _ingestion_source_payload(source: Any) -> dict[str, Any]:
+    return {
+        "id": source.id,
+        "source_type": source.source_type,
+        "name": source.name,
+        "location": source.location,
+        "enabled": source.enabled,
+        "schedule": source.schedule,
+        "scope": source.scope_json,
+        "created_at": source.created_at,
+        "updated_at": source.updated_at,
+    }
+
+
+def _ingestion_plan_payload(plan: Any) -> dict[str, Any]:
+    return {
+        "id": plan.id,
+        "source_id": plan.source_id,
+        "name": plan.name,
+        "status": plan.status,
+        "batch_size": plan.batch_size,
+        "schedule": plan.schedule,
+        "scope": plan.scope_json,
+        "created_at": plan.created_at,
+        "updated_at": plan.updated_at,
+    }
+
+
+def _ingestion_job_payload(job: Any) -> dict[str, Any]:
+    return {
+        "id": job.id,
+        "plan_id": job.plan_id,
+        "status": job.status,
+        "requested_limit": job.requested_limit,
+        "processed_count": job.processed_count,
+        "error_message": job.error_message,
+        "created_at": job.created_at,
+        "updated_at": job.updated_at,
+    }
+
+
+def _ingestion_review_item_payload(item: Any) -> dict[str, Any]:
+    return {
+        "id": item.id,
+        "source_id": item.source_id,
+        "document_id": item.document_id,
+        "source_uri": item.source_uri,
+        "file_name": item.file_name,
+        "content_hash": item.content_hash,
+        "review_status": item.review_status,
+        "quality_score": item.quality_score,
+        "notes": item.notes,
+        "created_at": item.created_at,
+        "updated_at": item.updated_at,
+    }
+
+
+def _ingestion_state() -> dict[str, Any]:
+    store = RagStore.for_project(REPO_ROOT)
+    sources = store.list_ingestion_sources()
+    plans = store.list_ingestion_plans()
+    jobs = store.list_ingestion_jobs()
+    review_items = store.list_ingestion_review_items()
+    return {
+        "sources": [_ingestion_source_payload(source) for source in sources],
+        "plans": [_ingestion_plan_payload(plan) for plan in plans],
+        "jobs": [_ingestion_job_payload(job) for job in jobs],
+        "review_items": [_ingestion_review_item_payload(item) for item in review_items],
+        "summary": {
+            "source_count": len(sources),
+            "plan_count": len(plans),
+            "job_count": len(jobs),
+            "review_item_count": len(review_items),
+            "needs_review_count": sum(
+                1 for item in review_items if item.review_status == "needs_review"
+            ),
+            "approved_count": sum(1 for item in review_items if item.review_status == "approved"),
+        },
+    }
+
+
+def _update_ingestion_review_item(payload: dict[str, Any]) -> dict[str, Any]:
+    review_item_id = int(payload.get("review_item_id", 0))
+    review_status = str(payload.get("review_status", "")).strip()
+    notes = str(payload.get("notes", "")).strip()
+    allowed_statuses = {"needs_review", "approved", "rejected", "failed", "stale"}
+    if review_item_id <= 0:
+        raise ValueError("`review_item_id` is required.")
+    if review_status not in allowed_statuses:
+        raise ValueError(f"`review_status` must be one of: {', '.join(sorted(allowed_statuses))}")
+    store = RagStore.for_project(REPO_ROOT)
+    store.update_ingestion_review_status(review_item_id, review_status=review_status, notes=notes)
+    return _ingestion_state()
+
+
 def _get_rag_document_detail(document_id: int) -> dict[str, Any]:
     store = RagStore.for_project(REPO_ROOT)
     metadata = store.get_document_metadata(document_id)
@@ -448,6 +563,21 @@ class WebMvpHandler(SimpleHTTPRequestHandler):
         if parsed_path.path == "/api/rag/documents":
             self._send_json(HTTPStatus.OK, _list_rag_documents())
             return
+        if parsed_path.path == "/api/ingestion/state":
+            self._send_json(HTTPStatus.OK, _ingestion_state())
+            return
+        if parsed_path.path == "/api/ingestion/sources":
+            self._send_json(HTTPStatus.OK, {"sources": _ingestion_state()["sources"]})
+            return
+        if parsed_path.path == "/api/ingestion/plans":
+            self._send_json(HTTPStatus.OK, {"plans": _ingestion_state()["plans"]})
+            return
+        if parsed_path.path == "/api/ingestion/jobs":
+            self._send_json(HTTPStatus.OK, {"jobs": _ingestion_state()["jobs"]})
+            return
+        if parsed_path.path == "/api/ingestion/review-items":
+            self._send_json(HTTPStatus.OK, {"review_items": _ingestion_state()["review_items"]})
+            return
         if parsed_path.path == "/api/rag/document":
             query = parse_qs(parsed_path.query)
             try:
@@ -479,6 +609,9 @@ class WebMvpHandler(SimpleHTTPRequestHandler):
             return
         if self.path == "/api/rag/reindex":
             self._handle_rag_reindex_request()
+            return
+        if self.path == "/api/ingestion/review":
+            self._handle_ingestion_review_request()
             return
 
         self._send_json(HTTPStatus.NOT_FOUND, {"error": "Unknown endpoint"})
@@ -600,6 +733,22 @@ class WebMvpHandler(SimpleHTTPRequestHandler):
             return
         except RuntimeError as exc:
             self._send_json(HTTPStatus.BAD_GATEWAY, {"error": str(exc)})
+            return
+        except Exception as exc:  # pragma: no cover - defensive endpoint guard
+            self._send_json(HTTPStatus.INTERNAL_SERVER_ERROR, {"error": str(exc)})
+            return
+
+        self._send_json(HTTPStatus.OK, result)
+
+    def _handle_ingestion_review_request(self) -> None:
+        payload = self._read_json_body()
+        if payload is None:
+            return
+
+        try:
+            result = _update_ingestion_review_item(payload)
+        except ValueError as exc:
+            self._send_json(HTTPStatus.BAD_REQUEST, {"error": str(exc)})
             return
         except Exception as exc:  # pragma: no cover - defensive endpoint guard
             self._send_json(HTTPStatus.INTERNAL_SERVER_ERROR, {"error": str(exc)})

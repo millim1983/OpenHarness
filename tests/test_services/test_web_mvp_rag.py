@@ -192,6 +192,8 @@ def test_index_document_for_rag_returns_document_status(tmp_path: Path, monkeypa
     assert status["embedding_profile"] == "openai-compatible"
     assert status["indexed_document_count"] == 1
     assert status["indexed_chunk_count"] >= 1
+    assert status["ingestion_source_id"] > 0
+    assert status["ingestion_review_item_id"] > 0
     assert status["documents"][0]["file_name"] == "notice.txt"
     assert status["documents"][0]["document_type"] == "announcement"
     assert status["documents"][0]["title"] == "Budget support is available."
@@ -237,6 +239,46 @@ def test_run_document_summary_stores_detail_artifact(tmp_path: Path, monkeypatch
     assert detail["structured"]["internal_execution_plan"]["immediate_next_actions"] == [
         "Call owner"
     ]
+
+
+def test_ingestion_state_and_review_update_helpers(tmp_path: Path, monkeypatch) -> None:
+    module = load_web_mvp_server()
+    store = RagStore(tmp_path / "rag.sqlite3")
+
+    monkeypatch.setattr(module, "load_settings", settings_with_profiles)
+    monkeypatch.setattr(
+        module,
+        "create_embedding_backend_for_profile",
+        lambda *args, **kwargs: FakeEmbeddingBackend(),
+    )
+    monkeypatch.setattr(module.RagStore, "for_project", classmethod(lambda cls, cwd: store))
+
+    indexed = module._index_document_for_rag(
+        chat_profile_name="gemini-compatible",
+        file_name="notice.txt",
+        extracted_text="Budget support is available.\n\nThe application deadline is Friday.",
+        instruction="Focus on deadlines.",
+        team_context="Alex PM: submission",
+    )
+
+    state = module._ingestion_state()
+    assert state["summary"]["source_count"] == 1
+    assert state["summary"]["review_item_count"] == 1
+    assert state["summary"]["needs_review_count"] == 1
+    assert state["sources"][0]["source_type"] == "upload"
+    assert state["review_items"][0]["document_id"] == indexed["indexed_document_id"]
+
+    updated = module._update_ingestion_review_item(
+        {
+            "review_item_id": indexed["ingestion_review_item_id"],
+            "review_status": "approved",
+            "notes": "Reviewed in dashboard.",
+        }
+    )
+
+    assert updated["summary"]["approved_count"] == 1
+    assert updated["review_items"][0]["review_status"] == "approved"
+    assert updated["review_items"][0]["notes"] == "Reviewed in dashboard."
 
 
 def test_rag_document_management_helpers(tmp_path: Path, monkeypatch) -> None:

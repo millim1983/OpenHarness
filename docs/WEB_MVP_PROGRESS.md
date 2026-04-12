@@ -518,6 +518,39 @@ Changed files:
 Verified:
 - `.venv/bin/python -m pytest tests/test_services/test_rag_core.py tests/test_services/test_web_mvp_rag.py tests/test_services/test_rag_metadata.py`
 - `.venv/bin/python -m pytest tests/test_services/test_rag_core.py tests/test_services/test_web_mvp_rag.py tests/test_services/test_web_runtime.py`
+
+## 2026-04-12 Ingestion Pipeline Shell
+
+Developed:
+- Added `docs/INGESTION_PIPELINE_PLAN.md` to record the RAG/data-pipeline direction.
+- Added ingestion dataclasses for sources, plans, jobs, and review items.
+- Added SQLite ingestion tables inside the existing project-local RAG database.
+- Added store helpers to create/list ingestion sources, plans, jobs, and review items.
+- Added review status updates for `needs_review`, `approved`, `rejected`, `failed`, and `stale`.
+- Connected Web MVP document uploads to ingestion tracking so each upload creates an upload source and review item.
+- Added API shell endpoints:
+  - `GET /api/ingestion/state`
+  - `GET /api/ingestion/sources`
+  - `GET /api/ingestion/plans`
+  - `GET /api/ingestion/jobs`
+  - `GET /api/ingestion/review-items`
+  - `POST /api/ingestion/review`
+
+Design decision:
+- Keep ingestion inside the agent product, but isolate it as a service/storage layer.
+- Keep SQLite as the initial implementation while preserving a path to future MetadataStore, VectorStore, and RawStore adapters.
+- Do not add real filesystem scanning, DB connectors, OCR, or scheduler automation yet. The first pass is the pipeline shell and review state model.
+
+Verified:
+- `.venv/bin/python -m pytest tests/test_services/test_ingestion_pipeline.py tests/test_services/test_web_mvp_rag.py tests/test_services/test_rag_core.py tests/test_services/test_web_runtime.py tests/test_services/test_rag_metadata.py tests/test_services/test_document_processing.py tests/test_services/test_announcement_workflow.py tests/test_services/test_compact.py`
+- Result: 30 passed in 2.61s.
+- `.venv/bin/python -m ruff check src/openharness/services src/openharness/tools scripts/web_mvp_server.py tests/test_services`
+- Result: All checks passed.
+
+Next plan:
+- Add a dashboard panel for ingestion sources and review items.
+- Add a dry-run ingestion plan creator before implementing real folder or DB scanning.
+- Add RAG search/list/get document tools so the future agent loop uses stable tool interfaces instead of direct SQLite/RAG internals.
 - `.venv/bin/python -m ruff check src/openharness/services/rag_types.py src/openharness/services/rag_retrieval.py src/openharness/services/rag_metadata.py scripts/web_mvp_server.py tests/test_services/test_rag_core.py tests/test_services/test_web_mvp_rag.py`
 - `/home/kiakiakia/.vscode-server/bin/07ff9d6178ede9a1bd12ad3399074d726ebe6e43/node --check frontend/web/app.js`
 - Real Web MVP smoke test on `http://127.0.0.1:8010` with `openai-compatible`:
