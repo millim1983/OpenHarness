@@ -551,6 +551,40 @@ Next plan:
 - Add a dashboard panel for ingestion sources and review items.
 - Add a dry-run ingestion plan creator before implementing real folder or DB scanning.
 - Add RAG search/list/get document tools so the future agent loop uses stable tool interfaces instead of direct SQLite/RAG internals.
+
+## 2026-04-12 RAG Toolization And Document Dashboard
+
+Developed:
+- Added RAG tools to prepare for a future agentic RAG implementation:
+  - `rag_search`
+  - `rag_list_documents`
+  - `rag_get_document`
+- Registered the RAG tools in the default OpenHarness tool registry.
+- Moved embedding-profile selection into the RAG service layer so web handlers and tools share the same selection behavior.
+- Split the Web MVP into two UI workspaces:
+  - Chat
+  - Document Pipeline
+- Added a right-side navigation panel to switch between chat and document processing.
+- Added a dedicated Document Processing Dashboard area with indexed RAG documents and ingestion review items.
+- Added browser controls to mark ingestion review items as approved, rejected, or needing review.
+
+Design decision:
+- RAG is now exposed through stable tool interfaces while the current implementation remains SQLite plus OpenAI-compatible embeddings.
+- The future agent loop should call `rag_search`/`rag_list_documents`/`rag_get_document` rather than directly calling SQLite or chunking internals.
+- Later agentic RAG can replace the internals behind `rag_search` without changing the tool contract.
+
+Verified:
+- `.venv/bin/python -m pytest tests/test_tools/test_rag_tools.py tests/test_services/test_ingestion_pipeline.py tests/test_services/test_web_mvp_rag.py tests/test_services/test_rag_core.py tests/test_services/test_web_runtime.py tests/test_services/test_rag_metadata.py tests/test_services/test_document_processing.py tests/test_services/test_announcement_workflow.py tests/test_services/test_compact.py`
+- Result: 32 passed in 2.26s.
+- `.venv/bin/python -m ruff check src/openharness/services src/openharness/tools scripts/web_mvp_server.py tests/test_services tests/test_tools`
+- Result: All checks passed.
+- `/home/kiakiakia/.vscode-server/bin/07ff9d6178ede9a1bd12ad3399074d726ebe6e43/node --check frontend/web/app.js`
+- Result: passed.
+
+Next plan:
+- Run the browser UI and manually check chat/document navigation plus ingestion review actions.
+- Add the first web agent endpoint after the RAG tool contract is stable.
+- Consider adding `rag_index_document` as a write tool only after user approval semantics are clearer.
 - `.venv/bin/python -m ruff check src/openharness/services/rag_types.py src/openharness/services/rag_retrieval.py src/openharness/services/rag_metadata.py scripts/web_mvp_server.py tests/test_services/test_rag_core.py tests/test_services/test_web_mvp_rag.py`
 - `/home/kiakiakia/.vscode-server/bin/07ff9d6178ede9a1bd12ad3399074d726ebe6e43/node --check frontend/web/app.js`
 - Real Web MVP smoke test on `http://127.0.0.1:8010` with `openai-compatible`:

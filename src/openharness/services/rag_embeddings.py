@@ -55,3 +55,40 @@ def create_embedding_backend_for_profile(
         base_url=profile.base_url,
         model=model,
     )
+
+
+def select_embedding_profile(
+    settings: Settings,
+    *,
+    chat_profile_name: str = "",
+    requested_profile_name: str = "",
+) -> str:
+    """Choose an OpenAI-compatible embedding profile for RAG."""
+    profiles = settings.merged_profiles()
+    candidates: list[str] = []
+    if requested_profile_name:
+        candidates.append(requested_profile_name)
+    chat_profile = profiles.get(chat_profile_name)
+    if chat_profile and chat_profile.provider == "openai" and chat_profile.api_format == "openai":
+        candidates.append(chat_profile_name)
+    candidates.append("openai-compatible")
+    candidates.extend(name for name, profile in profiles.items() if profile.api_format == "openai")
+
+    seen: set[str] = set()
+    for candidate in candidates:
+        if candidate in seen:
+            continue
+        seen.add(candidate)
+        profile = profiles.get(candidate)
+        if profile is None:
+            if candidate == requested_profile_name:
+                raise ValueError(f"Unknown embedding profile: {candidate}")
+            continue
+        if profile.api_format == "openai":
+            return candidate
+        if candidate == requested_profile_name:
+            raise ValueError(
+                f"Embedding profile must be openai-compatible, got {profile.api_format}: {candidate}"
+            )
+
+    raise ValueError("No openai-compatible profile is available for RAG embeddings.")

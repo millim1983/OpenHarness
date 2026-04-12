@@ -16,7 +16,10 @@ from urllib.parse import parse_qs, urlparse
 from openharness.config.paths import get_project_config_dir
 from openharness.config.settings import load_settings
 from openharness.services.document_processing import extract_text_from_document
-from openharness.services.rag_embeddings import create_embedding_backend_for_profile
+from openharness.services.rag_embeddings import (
+    create_embedding_backend_for_profile,
+    select_embedding_profile,
+)
 from openharness.services.rag_indexing import index_document
 from openharness.services.rag_metadata import build_rag_document_metadata
 from openharness.services.rag_retrieval import build_retrieval_context, retrieve_relevant_chunks
@@ -96,37 +99,12 @@ def _save_project_context(payload: dict[str, Any]) -> dict[str, str]:
 def _select_embedding_profile(
     settings: Any, chat_profile_name: str, requested_profile_name: str = ""
 ) -> str:
-    profiles = settings.merged_profiles()
-    candidates: list[str] = []
-    if requested_profile_name:
-        candidates.append(requested_profile_name)
     env_profile = os.environ.get("OPENHARNESS_RAG_EMBEDDING_PROFILE", "").strip()
-    if env_profile:
-        candidates.append(env_profile)
-    chat_profile = profiles.get(chat_profile_name)
-    if chat_profile and chat_profile.provider == "openai" and chat_profile.api_format == "openai":
-        candidates.append(chat_profile_name)
-    candidates.append("openai-compatible")
-    candidates.extend(name for name, profile in profiles.items() if profile.api_format == "openai")
-
-    seen: set[str] = set()
-    for candidate in candidates:
-        if candidate in seen:
-            continue
-        seen.add(candidate)
-        profile = profiles.get(candidate)
-        if profile is None:
-            if candidate == requested_profile_name:
-                raise ValueError(f"Unknown embedding profile: {candidate}")
-            continue
-        if profile.api_format == "openai":
-            return candidate
-        if candidate == requested_profile_name:
-            raise ValueError(
-                f"Embedding profile must be openai-compatible, got {profile.api_format}: {candidate}"
-            )
-
-    raise ValueError("No openai-compatible profile is available for RAG embeddings.")
+    return select_embedding_profile(
+        settings,
+        chat_profile_name=chat_profile_name,
+        requested_profile_name=requested_profile_name or env_profile,
+    )
 
 
 def _document_rag_status(store: RagStore) -> dict[str, Any]:

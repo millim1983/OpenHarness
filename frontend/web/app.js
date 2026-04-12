@@ -30,6 +30,11 @@ const ragFilterMinistry = document.querySelector("#ragFilterMinistry");
 const ragFilterAgency = document.querySelector("#ragFilterAgency");
 const ragFilterRdType = document.querySelector("#ragFilterRdType");
 const ragFilterBusinessType = document.querySelector("#ragFilterBusinessType");
+const refreshIngestionButton = document.querySelector("#refreshIngestionButton");
+const ingestionStats = document.querySelector("#ingestionStats");
+const ingestionReviewList = document.querySelector("#ingestionReviewList");
+const navButtons = Array.from(document.querySelectorAll(".nav-button[data-target-view]"));
+const workspaceViews = Array.from(document.querySelectorAll(".workspace-view[data-view]"));
 
 async function loadProfiles() {
   setStatus("Loading profiles...");
@@ -63,6 +68,21 @@ function setBusyState(isBusy) {
   processDocumentButton.disabled = isBusy;
   saveProjectContextButton.disabled = isBusy;
   refreshRagButton.disabled = isBusy;
+  refreshIngestionButton.disabled = isBusy;
+}
+
+function switchView(viewName) {
+  for (const view of workspaceViews) {
+    view.classList.toggle("is-active", view.dataset.view === viewName);
+  }
+  for (const button of navButtons) {
+    button.classList.toggle("is-active", button.dataset.targetView === viewName);
+  }
+  if (viewName === "documents") {
+    void Promise.all([loadRagDocuments(), loadIngestionState()]).catch((error) => {
+      setStatus(String(error.message || error));
+    });
+  }
 }
 
 function formatRagSources(rag) {
@@ -189,6 +209,105 @@ async function loadRagDocuments() {
     throw new Error(payload.error || "Failed to load RAG documents.");
   }
   renderRagDocuments(payload);
+}
+
+function renderIngestionState(payload) {
+  const summary = payload.summary || {};
+  const reviewItems = Array.isArray(payload.review_items) ? payload.review_items : [];
+  ingestionStats.textContent = [
+    `${summary.source_count || 0} sources`,
+    `${summary.plan_count || 0} plans`,
+    `${summary.job_count || 0} jobs`,
+    `${summary.review_item_count || 0} review items`,
+    `${summary.needs_review_count || 0} need review`,
+    `${summary.approved_count || 0} approved`,
+  ].join(" | ");
+  ingestionReviewList.innerHTML = "";
+
+  if (reviewItems.length === 0) {
+    const empty = document.createElement("p");
+    empty.className = "helper-text";
+    empty.textContent = "No ingestion review items yet.";
+    ingestionReviewList.appendChild(empty);
+    return;
+  }
+
+  for (const item of reviewItems) {
+    const row = document.createElement("article");
+    row.className = "ingestion-review-item";
+    const details = document.createElement("div");
+    const title = document.createElement("h3");
+    title.textContent = item.file_name || item.source_uri || `Review item ${item.id}`;
+    const meta = document.createElement("p");
+    meta.textContent = [
+      `status ${item.review_status}`,
+      item.document_id ? `document ${item.document_id}` : "",
+      item.quality_score !== null && item.quality_score !== undefined ? `quality ${item.quality_score}` : "",
+      item.source_uri ? `source ${item.source_uri}` : "",
+    ]
+      .filter(Boolean)
+      .join(" | ");
+    const notes = document.createElement("p");
+    notes.textContent = item.notes || "No review notes.";
+    details.appendChild(title);
+    details.appendChild(meta);
+    details.appendChild(notes);
+
+    const actions = document.createElement("div");
+    actions.className = "rag-document-actions";
+    for (const status of ["approved", "rejected", "needs_review"]) {
+      const button = document.createElement("button");
+      button.className = "ghost-button";
+      if (status === "rejected") {
+        button.classList.add("danger-button");
+      }
+      button.type = "button";
+      button.dataset.reviewItemId = String(item.id);
+      button.dataset.reviewStatus = status;
+      button.textContent =
+        status === "needs_review" ? "Needs Review" : status.charAt(0).toUpperCase() + status.slice(1);
+      actions.appendChild(button);
+    }
+
+    row.appendChild(details);
+    row.appendChild(actions);
+    ingestionReviewList.appendChild(row);
+  }
+}
+
+async function loadIngestionState() {
+  const response = await fetch("/api/ingestion/state");
+  const payload = await response.json();
+  if (!response.ok) {
+    throw new Error(payload.error || "Failed to load ingestion state.");
+  }
+  renderIngestionState(payload);
+}
+
+async function updateIngestionReviewStatus(reviewItemId, reviewStatus) {
+  setBusyState(true);
+  setStatus(`Updating review item ${reviewItemId}...`);
+  try {
+    const response = await fetch("/api/ingestion/review", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        review_item_id: Number(reviewItemId),
+        review_status: reviewStatus,
+        notes: reviewStatus === "approved" ? "Approved from document dashboard." : "",
+      }),
+    });
+    const payload = await response.json();
+    if (!response.ok) {
+      throw new Error(payload.error || "Failed to update ingestion review item.");
+    }
+    renderIngestionState(payload);
+    setStatus(`Review item ${reviewItemId} marked ${reviewStatus}.`);
+  } catch (error) {
+    setStatus(String(error.message || error));
+  } finally {
+    setBusyState(false);
+  }
 }
 
 async function loadProjectContext() {
@@ -697,6 +816,7 @@ async function processDocument() {
     documentStructuredOutput.textContent = formatStructuredInsights(payload.structured);
     documentExecutionOutput.textContent = formatExecutionPlan(payload.structured);
     renderRagDocuments(payload.rag || {});
+    await loadIngestionState();
     setStatus(`Document processed with ${payload.profile}. ${formatRagStatus(payload.rag)}`);
   } catch (error) {
     const message = String(error.message || error);
@@ -733,6 +853,29 @@ refreshRagButton.addEventListener("click", async () => {
     setStatus(String(error.message || error));
   }
 });
+
+refreshIngestionButton.addEventListener("click", async () => {
+  try {
+    await loadIngestionState();
+    setStatus("Ingestion state refreshed.");
+  } catch (error) {
+    setStatus(String(error.message || error));
+  }
+});
+
+ingestionReviewList.addEventListener("click", (event) => {
+  const button = event.target.closest("button[data-review-item-id]");
+  if (!button) {
+    return;
+  }
+  void updateIngestionReviewStatus(button.dataset.reviewItemId, button.dataset.reviewStatus);
+});
+
+for (const button of navButtons) {
+  button.addEventListener("click", () => {
+    switchView(button.dataset.targetView);
+  });
+}
 
 ragDocumentList.addEventListener("click", (event) => {
   const button = event.target.closest("button[data-action]");
@@ -817,6 +960,6 @@ messageInput.addEventListener("keydown", (event) => {
   }
 });
 
-void Promise.all([loadProfiles(), loadProjectContext(), loadRagDocuments()]).catch((error) => {
+void Promise.all([loadProfiles(), loadProjectContext(), loadRagDocuments(), loadIngestionState()]).catch((error) => {
   setStatus(String(error.message || error));
 });

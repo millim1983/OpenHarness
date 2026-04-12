@@ -16,110 +16,123 @@
         </p>
       </section>
 
-      <section class="chat-card">
-        <div class="toolbar">
-          <label class="field">
-            <span>Profile</span>
-            <select id="profileSelect"></select>
-          </label>
-          <button id="refreshProfilesButton" class="ghost-button" type="button">Refresh Profiles</button>
-        </div>
-
-        <label class="field">
-          <span>Message</span>
-          <textarea
-            id="messageInput"
-            rows="6"
-            placeholder="Ask something simple first. For example: Summarize what OpenHarness is in 3 bullet points."
-          ></textarea>
-        </label>
-        <p class="helper-text">
-          Uploaded documents are indexed for local RAG when an OpenAI-compatible embedding profile is configured. Follow-up chat will use retrieved document context when chunks are available.
-        </p>
-
-        <section class="project-context-panel">
-          <div class="response-header">
-            <h2>Project Context</h2>
-            <button id="saveProjectContextButton" class="ghost-button" type="button">Save Defaults</button>
-          </div>
-          <label class="field">
-            <span>System Prompt</span>
-            <textarea
-              id="systemPromptInput"
-              rows="4"
-              placeholder="How this workspace should think and respond."
-            ></textarea>
-          </label>
-          <p class="helper-text">
-            These defaults are reused for chat and document analysis. Change them once, then upload normally.
-          </p>
-        </section>
-
-        <section class="rag-filter-panel">
-          <h2>RAG Filters</h2>
-          <div class="rag-filter-grid">
+      <div class="workspace-layout">
+        <section class="chat-card workspace-content">
+          <div class="toolbar">
             <label class="field">
-              <span>Document Type</span>
-              <select id="ragFilterDocumentType">
-                <option value="">Any</option>
-                <option value="announcement">Announcement</option>
-                <option value="regulation">Regulation</option>
-                <option value="technical">Technical</option>
-                <option value="company_team">Company/team</option>
-                <option value="unknown">Unknown</option>
-              </select>
+              <span>Profile</span>
+              <select id="profileSelect"></select>
             </label>
-            <label class="field">
-              <span>Ministry</span>
-              <input id="ragFilterMinistry" type="text" placeholder="Any ministry">
-            </label>
-            <label class="field">
-              <span>Agency</span>
-              <input id="ragFilterAgency" type="text" placeholder="Any agency">
-            </label>
-            <label class="field">
-              <span>R&amp;D Type</span>
-              <select id="ragFilterRdType">
-                <option value="">Any</option>
-                <option value="rd">R&amp;D</option>
-                <option value="non_rd">Non-R&amp;D</option>
-              </select>
-            </label>
-            <label class="field">
-              <span>Business Type</span>
-              <input id="ragFilterBusinessType" type="text" placeholder="Any business type">
-            </label>
+            <button id="refreshProfilesButton" class="ghost-button" type="button">Refresh Profiles</button>
           </div>
-        </section>
 
-        <div class="actions">
-          <button id="sendButton" class="primary-button" type="button">Send</button>
-          <p id="statusText" class="status-text">Ready</p>
-        </div>
+          <section id="chatView" class="workspace-view is-active" data-view="chat">
+            <label class="field">
+              <span>Message</span>
+              <textarea
+                id="messageInput"
+                rows="6"
+                placeholder="Ask against the indexed document base."
+              ></textarea>
+            </label>
+            <p class="helper-text">
+              Follow-up chat uses retrieved document context when indexed chunks match the question.
+            </p>
 
-        <section class="response-panel">
-          <div class="response-header">
-            <h2>Answer</h2>
-            <button id="copyButton" class="ghost-button" type="button">Copy</button>
-          </div>
-          <pre id="responseOutput">No response yet.</pre>
-          <div class="source-panel">
-            <h3>RAG Sources</h3>
-            <pre id="ragSourceOutput">No retrieval sources yet.</pre>
-          </div>
-        </section>
+            <section class="project-context-panel">
+              <div class="response-header">
+                <h2>Project Context</h2>
+                <button id="saveProjectContextButton" class="ghost-button" type="button">Save Defaults</button>
+              </div>
+              <label class="field">
+                <span>System Prompt</span>
+                <textarea
+                  id="systemPromptInput"
+                  rows="4"
+                  placeholder="How this workspace should think and respond."
+                ></textarea>
+              </label>
+              <p class="helper-text">
+                These defaults are reused for chat and document analysis.
+              </p>
+            </section>
 
-        <section class="rag-dashboard">
-          <div class="response-header">
-            <h2>RAG Document Dashboard</h2>
-            <button id="refreshRagButton" class="ghost-button" type="button">Refresh RAG</button>
-          </div>
-          <div class="rag-stats" id="ragStats">No RAG documents loaded yet.</div>
-          <div class="rag-db-path" id="ragDbPath">DB path unavailable.</div>
-          <div class="rag-document-list" id="ragDocumentList"></div>
-        </section>
+            <section class="rag-filter-panel">
+              <h2>RAG Filters</h2>
+              <div class="rag-filter-grid">
+                <label class="field">
+                  <span>Document Type</span>
+                  <select id="ragFilterDocumentType">
+                    <option value="">Any</option>
+                    <option value="announcement">Announcement</option>
+                    <option value="regulation">Regulation</option>
+                    <option value="technical">Technical</option>
+                    <option value="company_team">Company/team</option>
+                    <option value="unknown">Unknown</option>
+                  </select>
+                </label>
+                <label class="field">
+                  <span>Ministry</span>
+                  <input id="ragFilterMinistry" type="text" placeholder="Any ministry">
+                </label>
+                <label class="field">
+                  <span>Agency</span>
+                  <input id="ragFilterAgency" type="text" placeholder="Any agency">
+                </label>
+                <label class="field">
+                  <span>R&amp;D Type</span>
+                  <select id="ragFilterRdType">
+                    <option value="">Any</option>
+                    <option value="rd">R&amp;D</option>
+                    <option value="non_rd">Non-R&amp;D</option>
+                  </select>
+                </label>
+                <label class="field">
+                  <span>Business Type</span>
+                  <input id="ragFilterBusinessType" type="text" placeholder="Any business type">
+                </label>
+              </div>
+            </section>
 
-        <section class="document-panel">
+            <div class="actions">
+              <button id="sendButton" class="primary-button" type="button">Send</button>
+              <p id="statusText" class="status-text">Ready</p>
+            </div>
+
+            <section class="response-panel">
+              <div class="response-header">
+                <h2>Answer</h2>
+                <button id="copyButton" class="ghost-button" type="button">Copy</button>
+              </div>
+              <pre id="responseOutput">No response yet.</pre>
+              <div class="source-panel">
+                <h3>RAG Sources</h3>
+                <pre id="ragSourceOutput">No retrieval sources yet.</pre>
+              </div>
+            </section>
+          </section>
+
+          <section id="documentView" class="workspace-view" data-view="documents">
+            <section class="rag-dashboard">
+              <div class="response-header">
+                <h2>Document Processing Dashboard</h2>
+                <button id="refreshRagButton" class="ghost-button" type="button">Refresh RAG</button>
+              </div>
+              <div class="rag-stats" id="ragStats">No RAG documents loaded yet.</div>
+              <div class="rag-db-path" id="ragDbPath">DB path unavailable.</div>
+              <div class="rag-document-list" id="ragDocumentList"></div>
+            </section>
+
+            <section class="ingestion-dashboard">
+              <div class="response-header">
+                <h2>Ingestion Review</h2>
+                <button id="refreshIngestionButton" class="ghost-button" type="button">Refresh Ingestion</button>
+              </div>
+              <div class="ingestion-stats" id="ingestionStats">No ingestion state loaded yet.</div>
+              <div class="ingestion-review-list" id="ingestionReviewList"></div>
+            </section>
+
+            <section class="document-panel">
           <div class="response-header">
             <h2>Announcement Analysis</h2>
             <button id="processDocumentButton" class="primary-button" type="button">Upload and Analyze</button>
@@ -187,7 +200,14 @@
             </section>
           </div>
         </section>
-      </section>
+          </section>
+        </section>
+
+        <aside class="nav-panel" aria-label="Workspace navigation">
+          <button class="nav-button is-active" type="button" data-target-view="chat">Chat</button>
+          <button class="nav-button" type="button" data-target-view="documents">Document Pipeline</button>
+        </aside>
+      </div>
     </main>
 
     <script src="./app.js" defer></script>
