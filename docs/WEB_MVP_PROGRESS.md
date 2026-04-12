@@ -649,7 +649,7 @@ Operational rule:
 
 Developed:
 - Added the first `공고 에이전트` automation service.
-- The service creates a project folder named with the rule `제출마감일-전문기관약자-사업명`.
+- The service creates a project folder named with the rule `yymmdd-전문기관약자 또는 전문기관명-사업명`.
 - The uploaded source file is saved under `00_공고_원문`.
 - The service generates `총괄장.xlsx` with these tabs:
   - `사업개요`
@@ -667,6 +667,11 @@ Configuration:
 
 Current limitation:
 - Multi-file folder upload, folder monitoring, automatic movement of whole upload bundles, and approval-gated execution UI remain next steps.
+
+Update:
+- Added an agency alias dictionary at `src/openharness/services/workflows/agency_aliases.py`.
+- Folder naming now preserves hyphen separators, e.g. `260501-KIAT-사업명`.
+- Agency extraction checks business-type variants such as `agency`, `professional_agency`, `dedicated_agency`, `ordering_agency`, and `client`.
 - `.venv/bin/python -m ruff check src/openharness/services/rag_types.py src/openharness/services/rag_retrieval.py src/openharness/services/rag_metadata.py scripts/web_mvp_server.py tests/test_services/test_rag_core.py tests/test_services/test_web_mvp_rag.py`
 - `/home/kiakiakia/.vscode-server/bin/07ff9d6178ede9a1bd12ad3399074d726ebe6e43/node --check frontend/web/app.js`
 - Real Web MVP smoke test on `http://127.0.0.1:8010` with `openai-compatible`:

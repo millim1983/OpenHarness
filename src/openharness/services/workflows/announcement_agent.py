@@ -9,6 +9,7 @@ from datetime import datetime
 from pathlib import Path
 from typing import Any
 
+from openharness.services.workflows.agency_aliases import resolve_agency_label
 from openharness.services.workflows.proposal_ops import build_proposal_ops_preview
 from openharness.services.workflows.xlsx_writer import write_xlsx
 
@@ -42,7 +43,7 @@ def run_announcement_agent(request: AnnouncementAgentRequest) -> dict[str, Any]:
     schedule = _as_dict(structured.get("application_schedule"))
     title = str(overview.get("title") or Path(request.file_name).stem)
     deadline = _deadline_for_folder(schedule)
-    agency = _agency_abbreviation(structured)
+    agency = _agency_folder_label(structured)
     folder_name = _safe_path_segment(f"{deadline}-{agency}-{title}")
     project_dir = output_root / folder_name
     source_dir = project_dir / "00_공고_원문"
@@ -220,7 +221,7 @@ def _monitoring_row(file_name: str, structured: dict[str, Any]) -> dict[str, str
         "uploaded_at": datetime.now().strftime("%Y-%m-%d %H:%M"),
         "source_file": file_name,
         "ministry": str(metadata.get("ministry") or ""),
-        "agency": _agency_abbreviation(structured),
+        "agency": _agency_folder_label(structured),
         "business_type": str(overview.get("project_type") or ""),
         "program_name": str(overview.get("title") or ""),
         "task_count": "",
@@ -278,14 +279,21 @@ def _load_monitoring_rows(path: Path) -> list[dict[str, str]]:
 def _deadline_for_folder(schedule: dict[str, Any]) -> str:
     raw = str(schedule.get("submission_deadline") or schedule.get("end_at") or "").strip()
     digits = "".join(char for char in raw if char.isdigit())
-    return digits[:8] if len(digits) >= 8 else "마감일확인"
+    return digits[2:8] if len(digits) >= 8 else "마감일확인"
 
 
-def _agency_abbreviation(structured: dict[str, Any]) -> str:
+def _agency_folder_label(structured: dict[str, Any]) -> str:
     metadata = structured.get("metadata") if isinstance(structured.get("metadata"), dict) else {}
-    agency = str(metadata.get("agency") or metadata.get("ministry") or "").strip()
+    agency = str(
+        metadata.get("agency")
+        or metadata.get("professional_agency")
+        or metadata.get("dedicated_agency")
+        or metadata.get("ordering_agency")
+        or metadata.get("client")
+        or ""
+    ).strip()
     if agency:
-        return _safe_path_segment(agency)[:12]
+        return _safe_path_segment(resolve_agency_label(agency))
     return "기관확인"
 
 
@@ -302,7 +310,7 @@ def _yes_no(value: Any) -> str:
 
 
 def _safe_path_segment(value: str) -> str:
-    cleaned = "".join(char if char.isalnum() else "_" for char in value.strip())
+    cleaned = "".join(char if char.isalnum() or char == "-" else "_" for char in value.strip())
     cleaned = "_".join(part for part in cleaned.split("_") if part)
     return cleaned[:120] or "untitled"
 

@@ -59,7 +59,7 @@ Initial behavior:
 1. Process the uploaded notice through the document/RAG path.
 2. Extract structured announcement information from the notice.
 3. Create a project folder under the configured proposal output root.
-4. Use folder naming rule: `제출마감일-전문기관약자-사업명`.
+4. Use folder naming rule: `yymmdd-전문기관약자 또는 전문기관명-사업명`.
 5. Save the uploaded source file under `00_공고_원문`.
 6. Create `총괄장.xlsx` with tabs:
    - `사업개요`
@@ -79,6 +79,21 @@ Current limitation:
 - Multi-file folder upload and folder monitoring are not implemented yet.
 - The first pass saves the uploaded file and generates workbooks for the analyzed notice.
 - Monitoring workbook updates are implemented by regenerating the workbook from a JSON sidecar.
+
+## Agency Alias Rule
+
+The announcement agent uses an agency alias dictionary for the folder name.
+
+- Alias source: `src/openharness/services/workflows/agency_aliases.py`
+- If the extracted agency matches a known agency, use the managed abbreviation.
+- If no alias exists, use the full extracted agency name.
+- The extracted agency field may be called `agency`, `professional_agency`, `dedicated_agency`, `ordering_agency`, or `client` depending on business type.
+
+The agency means the organization responsible for evaluation/administration:
+
+- SI: 발주처
+- R&D: 전문기관
+- Non-R&D/support programs: 전담기관 or 사업담당부서
 
 ## Future Configurable Inputs
 

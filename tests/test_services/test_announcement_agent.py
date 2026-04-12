@@ -16,7 +16,7 @@ def test_run_announcement_agent_creates_project_folder_and_workbooks(tmp_path: P
             file_bytes=b"pdf bytes",
             output_root=tmp_path,
             structured_analysis={
-                "metadata": {"agency": "KIAT", "ministry": "MOTIE"},
+                "metadata": {"agency": "한국산업기술진흥원", "ministry": "MOTIE"},
                 "announcement_overview": {
                     "title": "AI Product Support",
                     "main_purpose": "Commercialization",
@@ -49,6 +49,8 @@ def test_run_announcement_agent_creates_project_folder_and_workbooks(tmp_path: P
 
     project_dir = Path(result["project_dir"])
     assert project_dir.exists()
+    assert result["folder_name"].startswith("260501-KIAT-AI_Product_Support")
+    assert result["monitoring_row"]["agency"] == "KIAT"
     assert Path(result["saved_source_files"][0]).read_bytes() == b"pdf bytes"
     assert Path(result["summary_workbook"]).exists()
     assert Path(result["monitoring_workbook"]).exists()
@@ -60,3 +62,23 @@ def test_run_announcement_agent_creates_project_folder_and_workbooks(tmp_path: P
         workbook_xml = workbook.read("xl/workbook.xml").decode("utf-8")
         assert "사업개요" in workbook_xml
         assert "제출서류" in workbook_xml
+
+
+def test_run_announcement_agent_uses_full_agency_name_when_alias_missing(
+    tmp_path: Path,
+) -> None:
+    result = run_announcement_agent(
+        AnnouncementAgentRequest(
+            file_name="notice.pdf",
+            file_bytes=b"pdf bytes",
+            output_root=tmp_path,
+            structured_analysis={
+                "metadata": {"ordering_agency": "서울특별시"},
+                "announcement_overview": {"title": "Smart City SI"},
+                "application_schedule": {"submission_deadline": "2026.06.02 15:00"},
+            },
+        )
+    )
+
+    assert result["folder_name"].startswith("260602-서울특별시-Smart_City_SI")
+    assert result["monitoring_row"]["agency"] == "서울특별시"
