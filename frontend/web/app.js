@@ -35,8 +35,8 @@ const ingestionStats = document.querySelector("#ingestionStats");
 const ingestionReviewList = document.querySelector("#ingestionReviewList");
 const navButtons = Array.from(document.querySelectorAll(".nav-button[data-target-view]"));
 const workspaceViews = Array.from(document.querySelectorAll(".workspace-view[data-view]"));
-const proposalOpsOutput = document.querySelector("#proposalOpsOutput");
-const copyProposalOpsButton = document.querySelector("#copyProposalOpsButton");
+const proposalOpsEmpty = document.querySelector("#proposalOpsEmpty");
+const proposalOpsContent = document.querySelector("#proposalOpsContent");
 const announcementAgentMeta = document.querySelector("#announcementAgentMeta");
 const announcementFolderInput = document.querySelector("#announcementFolderInput");
 const runAnnouncementAgentButton = document.querySelector("#runAnnouncementAgentButton");
@@ -458,38 +458,143 @@ function formatRagStatus(rag) {
   return rag.reason || "아직 RAG를 사용하지 않았습니다.";
 }
 
-function formatProposalOpsPlan(plan) {
+function renderProposalOpsDashboard(plan) {
   if (!plan || typeof plan !== "object") {
-    return "아직 제안 운영 계획이 없습니다.";
+    if (proposalOpsEmpty) proposalOpsEmpty.hidden = false;
+    if (proposalOpsContent) proposalOpsContent.hidden = true;
+    return;
   }
-  const summary = plan.project_summary || {};
-  const lines = [];
-  lines.push("사업 요약");
-  lines.push(`- 제목: ${summary.title || "미확인"}`);
-  lines.push(`- 원본 파일: ${summary.source_file || "미확인"}`);
-  lines.push(`- 프로젝트 유형: ${summary.project_type || "미확인"}`);
-  lines.push(`- 사업 유형: ${summary.business_type || "미확인"}`);
-  lines.push(`- 제출 마감: ${summary.submission_deadline || "검토 필요"}`);
-  lines.push(`- 제출 채널: ${summary.submission_channel || "검토 필요"}`);
 
-  appendObjectList(lines, "제출 체크리스트", plan.submission_checklist, (item) =>
-    `- [${formatReviewStatus(item.status || "needs_review")}] ${item.item || "이름 없는 항목"} | 담당: ${item.owner || "미배정"}${item.basis ? ` | 근거: ${item.basis}` : ""}`
-  );
-  appendObjectList(lines, "관리자 확인 질문", plan.manager_questions, (item) =>
-    `- ${item.question || "미정 질문"} | 대상: ${item.target || "미배정"} | 사유: ${item.reason || "검토"}`
-  );
-  appendObjectList(lines, "역할별 업무", plan.role_tasks, (item) => {
-    const tasks = Array.isArray(item.tasks) ? item.tasks.join("; ") : "등록된 업무 없음";
-    return `- ${item.role || "역할"} / ${item.owner || "미배정"}: ${tasks}${item.manager_plus_one ? ` | +1: ${item.manager_plus_one}` : ""}`;
-  });
-  appendObjectList(lines, "리마인드 계획", plan.reminder_plan, (item) =>
-    `- ${item.phase || "단계"}: ${item.cadence || "주기"} | ${item.target || "대상"} | ${item.condition || "조건"}`
-  );
-  appendTextList(lines, "폴더 계획", plan.folder_plan);
-  appendTextList(lines, "파일 산출물 계획", plan.file_plan);
-  appendTextList(lines, "실행 미리보기", plan.execution_preview);
-  appendTextList(lines, "추가 입력 필요사항", plan.needs_manual_inputs);
-  return lines.join("\n").trim();
+  if (proposalOpsEmpty) proposalOpsEmpty.hidden = true;
+  if (proposalOpsContent) proposalOpsContent.hidden = false;
+
+  const summary = plan.project_summary || {};
+  const checklist = Array.isArray(plan.submission_checklist) ? plan.submission_checklist : [];
+  const questions = Array.isArray(plan.manager_questions) ? plan.manager_questions : [];
+  const roleTasks = Array.isArray(plan.role_tasks) ? plan.role_tasks : [];
+  const folderPlan = Array.isArray(plan.folder_plan) ? plan.folder_plan : [];
+  const reminderPlan = Array.isArray(plan.reminder_plan) ? plan.reminder_plan : [];
+
+  // 헤더
+  const poTitle = document.querySelector("#poTitle");
+  const poMeta = document.querySelector("#poMeta");
+  const poCountdown = document.querySelector("#poCountdown");
+  const poCountdownLabel = document.querySelector("#poCountdownLabel");
+  if (poTitle) poTitle.textContent = summary.title || "제목 미확인";
+  if (poMeta) poMeta.textContent = `원본: ${summary.source_file || "미확인"} · ${summary.project_type || ""}`;
+
+  const deadline = summary.submission_deadline || "";
+  if (poCountdown && poCountdownLabel) {
+    const parsed = deadline ? new Date(deadline.slice(0, 10)) : null;
+    if (parsed && !isNaN(parsed)) {
+      const diffDays = Math.max(0, Math.ceil((parsed - Date.now()) / 86400000));
+      poCountdown.textContent = diffDays;
+      poCountdownLabel.textContent = `일 남음 (${deadline})`;
+      poCountdown.classList.toggle("safe", diffDays > 7);
+    } else {
+      poCountdown.textContent = "—";
+      poCountdownLabel.textContent = deadline || "마감일 확인 필요";
+    }
+  }
+
+  // 지표: 제출서류
+  const poDoneCount = document.querySelector("#poDoneCount");
+  const poTotalCount = document.querySelector("#poTotalCount");
+  const poProgressFill = document.querySelector("#poProgressFill");
+  if (poTotalCount) poTotalCount.textContent = `/${checklist.length}`;
+  const updateChecklistProgress = () => {
+    const total = checklist.length;
+    const done = document.querySelectorAll(".po-check-box.done").length;
+    if (poDoneCount) poDoneCount.textContent = done;
+    if (poProgressFill) poProgressFill.style.width = total ? ((done / total) * 100).toFixed(1) + "%" : "0%";
+  };
+  window._poUpdateChecklist = updateChecklistProgress;
+
+  // 지표: 역할 배정
+  const poRoleCount = document.querySelector("#poRoleCount");
+  const poRoleSub = document.querySelector("#poRoleSub");
+  const unassigned = roleTasks.filter(r => !r.owner || r.owner === "TBD" || r.owner === "Unassigned").length;
+  if (poRoleCount) poRoleCount.textContent = `${roleTasks.length}개 역할`;
+  if (poRoleSub) poRoleSub.textContent = unassigned > 0 ? `${unassigned}개 미배정` : "전원 배정 완료";
+
+  // 지표: 사업 유형
+  const poBusinessType = document.querySelector("#poBusinessType");
+  const poChannel = document.querySelector("#poChannel");
+  const btMap = { rd: "R&D", service_contract: "용역", support_program: "지원사업", unknown: "미확인" };
+  if (poBusinessType) poBusinessType.textContent = btMap[summary.business_type] || summary.business_type || "미확인";
+  if (poChannel) poChannel.textContent = summary.submission_channel || "";
+
+  // 체크리스트
+  const poChecklist = document.querySelector("#poChecklist");
+  if (poChecklist) {
+    poChecklist.innerHTML = checklist.map(item => `
+      <div class="po-check-item">
+        <div class="po-check-box" onclick="this.classList.toggle('done'); window._poUpdateChecklist && window._poUpdateChecklist();"></div>
+        <div>
+          <div>${_esc(item.item || "항목 미확인")}</div>
+          <div><span class="po-role-tag">${_esc(item.owner || "미배정")}</span></div>
+        </div>
+      </div>
+    `).join("") || "<p style='font-size:.8rem;color:#999'>체크리스트 항목이 없습니다.</p>";
+  }
+
+  // 확인 필요사항
+  const poQuestions = document.querySelector("#poQuestions");
+  if (poQuestions) {
+    poQuestions.innerHTML = questions.map(q => `
+      <div class="po-q-item">
+        <div class="po-q-icon">!</div>
+        <div>${_esc(q.question || "질문 미확인")}</div>
+      </div>
+    `).join("") || "<p style='font-size:.8rem;color:#999'>확인 항목이 없습니다.</p>";
+  }
+
+  // 역할별 담당
+  const poRoles = document.querySelector("#poRoles");
+  if (poRoles) {
+    poRoles.innerHTML = roleTasks.map(r => {
+      const owner = r.owner || "Unassigned";
+      const isTbd = !owner || owner === "TBD" || owner === "Unassigned";
+      const badgeClass = isTbd ? "po-badge-unassigned" : "po-badge-assigned";
+      const badgeText = isTbd ? "미배정" : owner;
+      return `
+        <div class="po-role-row">
+          <span class="po-role-name">${_esc(r.label || r.role || "역할")}</span>
+          <span class="po-badge ${badgeClass}">${_esc(badgeText)}</span>
+        </div>
+      `;
+    }).join("") || "<p style='font-size:.8rem;color:#999'>역할 정보가 없습니다.</p>";
+  }
+
+  // 생성 폴더
+  const poFolders = document.querySelector("#poFolders");
+  if (poFolders) {
+    poFolders.innerHTML = folderPlan.map(path => {
+      const name = path.split("/").pop() || path;
+      return `<div class="po-folder-item"><span class="po-folder-icon">📁</span>${_esc(name)}</div>`;
+    }).join("") || "<p style='font-size:.8rem;color:#999'>폴더 계획이 없습니다.</p>";
+  }
+
+  // 리마인드
+  const poReminder = document.querySelector("#poReminder");
+  if (poReminder) {
+    poReminder.innerHTML = reminderPlan.map(r => {
+      const urgent = r.phase === "deadline_watch";
+      return `
+        <div class="po-reminder-phase${urgent ? " urgent" : ""}">
+          <div class="po-reminder-when">${_esc(r.condition || r.phase || "")}</div>
+          <div class="po-reminder-cadence">${_esc(r.cadence || "")}</div>
+          <div class="po-reminder-target">${_esc(r.target || "")}</div>
+        </div>
+      `;
+    }).join("") || "<p style='font-size:.8rem;color:#999;padding:8px'>리마인드 계획이 없습니다.</p>";
+  }
+
+  updateChecklistProgress();
+}
+
+function _esc(str) {
+  return String(str).replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
 }
 
 function formatAnnouncementAgentMeta(agent) {
@@ -1006,8 +1111,9 @@ async function processDocument() {
     documentSummaryOutput.textContent = payload.summary || "(빈 요약)";
     documentStructuredOutput.textContent = formatStructuredInsights(payload.structured);
     documentExecutionOutput.textContent = formatExecutionPlan(payload.structured);
-    proposalOpsOutput.textContent = formatProposalOpsPlan(payload.proposal_ops);
+    renderProposalOpsDashboard(payload.proposal_ops);
     announcementAgentMeta.textContent = formatAnnouncementAgentMeta(payload.announcement_agent);
+    announcementAgentMeta.style.display = payload.announcement_agent?.enabled ? "block" : "none";
     renderRagDocuments(payload.rag || {});
     await loadIngestionState();
     setStatus(`${payload.profile} 프로필로 문서를 처리했습니다. ${formatRagStatus(payload.rag)}`);
@@ -1082,7 +1188,7 @@ async function runAnnouncementAgentBundle() {
       `${payload.file_count || files.length}개 파일 처리 완료. 생성 폴더: ${agent.project_dir || "확인 필요"}`;
     announcementAgentOutput.textContent = formatAnnouncementAgentBundleResult(payload);
     announcementDashboardOutput.textContent = formatAnnouncementDashboard(agent.dashboard_stats);
-    proposalOpsOutput.textContent = formatProposalOpsPlan(payload.proposal_ops);
+    renderProposalOpsDashboard(payload.proposal_ops);
     announcementAgentMeta.textContent = formatAnnouncementAgentMeta(agent);
     if (payload.structured) {
       documentStructuredOutput.textContent = formatStructuredInsights(payload.structured);
@@ -1294,13 +1400,6 @@ copyExecutionButton.addEventListener("click", () => {
   );
 });
 
-copyProposalOpsButton.addEventListener("click", () => {
-  void copyText(
-    proposalOpsOutput.textContent,
-    "아직 제안 운영 계획이 없습니다.",
-    "제안 운영 계획을 복사했습니다."
-  );
-});
 
 copyAnnouncementAgentButton.addEventListener("click", () => {
   void copyText(

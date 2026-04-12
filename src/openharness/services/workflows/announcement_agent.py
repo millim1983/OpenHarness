@@ -293,20 +293,16 @@ def _consortium_rows(consortium: dict[str, Any]) -> list[list[object]]:
 
 def _monitoring_row(file_name: str, structured: dict[str, Any]) -> dict[str, str]:
     overview = _as_dict(structured.get("announcement_overview"))
-    metadata = structured.get("metadata") if isinstance(structured.get("metadata"), dict) else {}
     schedule = _as_dict(structured.get("application_schedule"))
     budget = _as_dict(structured.get("budget"))
     return {
         "uploaded_at": datetime.now().strftime("%Y-%m-%d %H:%M"),
         "source_file": file_name,
-        "ministry": str(metadata.get("ministry") or ""),
+        "ministry": str(overview.get("ministry") or overview.get("ordering_agency") or ""),
         "agency": _agency_folder_label(structured),
         "business_type": str(overview.get("project_type") or ""),
         "business_domain": str(
-            metadata.get("business_domain")
-            or metadata.get("technology_domain")
-            or overview.get("technology_domain")
-            or overview.get("main_purpose")
+            overview.get("main_purpose")
             or ""
         ),
         "program_name": str(overview.get("title") or ""),
@@ -412,13 +408,13 @@ def _deadline_for_folder(schedule: dict[str, Any]) -> str:
 
 def _agency_folder_label(structured: dict[str, Any]) -> str:
     folder_rules = load_folder_rules()
-    metadata = structured.get("metadata") if isinstance(structured.get("metadata"), dict) else {}
+    overview = structured.get("announcement_overview") if isinstance(structured.get("announcement_overview"), dict) else {}
     source_fields = folder_rules.get("agency_source_fields", [])
     if not isinstance(source_fields, list) or not source_fields:
-        source_fields = ["agency", "professional_agency", "dedicated_agency", "ordering_agency", "client"]
+        source_fields = ["professional_agency", "dedicated_agency", "ordering_agency", "agency", "client"]
     agency = ""
     for field in source_fields:
-        agency = str(metadata.get(str(field)) or "").strip()
+        agency = str(overview.get(str(field)) or "").strip()
         if agency:
             break
     if agency:

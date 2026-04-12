@@ -582,6 +582,22 @@ class RagStore:
             "artifact_updated_at": str(row["updated_at"]),
         }
 
+    def patch_document_metadata(self, document_id: int, updates: dict[str, object]) -> None:
+        """Merge *updates* into an existing document's metadata_json without touching chunks."""
+        with self._connect() as connection:
+            row = connection.execute(
+                "SELECT metadata_json FROM documents WHERE id = ?",
+                (document_id,),
+            ).fetchone()
+            if row is None:
+                raise ValueError(f"Unknown document id: {document_id}")
+            current: dict[str, object] = json.loads(str(row["metadata_json"])) if row["metadata_json"] else {}
+            current.update(updates)
+            connection.execute(
+                "UPDATE documents SET metadata_json = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?",
+                (json.dumps(current, ensure_ascii=True, sort_keys=True), document_id),
+            )
+
     def delete_document(self, document_id: int) -> None:
         """Delete one document and its chunks."""
         with self._connect() as connection:

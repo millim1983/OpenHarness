@@ -283,7 +283,268 @@ textarea {
   box-shadow: var(--shadow);
 }
 
-.proposal-ops-panel,
+/* ── 제안 운영 대시보드 ─────────────────────────── */
+.po-dashboard {
+  padding: 4px 0;
+}
+
+/* 빈 상태 */
+.po-empty {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: 64px 24px;
+  text-align: center;
+  color: var(--muted);
+  gap: 10px;
+}
+.po-empty-icon { font-size: 32px; opacity: .5; }
+.po-empty p { font-size: 0.9rem; line-height: 1.6; margin: 0; }
+
+/* 헤더 */
+.po-header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 16px;
+  margin-bottom: 14px;
+  flex-wrap: wrap;
+}
+.po-eyebrow {
+  font-size: 0.72rem;
+  font-weight: 600;
+  color: var(--primary);
+  text-transform: uppercase;
+  letter-spacing: .05em;
+  margin-bottom: 4px;
+}
+.po-title {
+  font-size: 1.05rem;
+  font-weight: 600;
+  line-height: 1.45;
+  color: var(--text);
+}
+.po-meta {
+  font-size: 0.78rem;
+  color: var(--muted);
+  margin-top: 3px;
+}
+.po-countdown-block { text-align: right; flex-shrink: 0; }
+.po-countdown {
+  font-size: 2rem;
+  font-weight: 600;
+  color: #c0392b;
+  line-height: 1;
+}
+.po-countdown.safe { color: var(--primary); }
+.po-countdown-label {
+  font-size: 0.72rem;
+  color: var(--muted);
+  margin-top: 2px;
+}
+
+/* 지표 카드 */
+.po-metrics {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 10px;
+  margin-bottom: 12px;
+}
+.po-metric {
+  background: #f0f5ff;
+  border: 1px solid #dbeafe;
+  border-radius: var(--radius);
+  padding: 12px 14px;
+}
+.po-metric-label {
+  font-size: 0.72rem;
+  color: #4a6fa5;
+  margin-bottom: 4px;
+}
+.po-metric-value {
+  font-size: 1.4rem;
+  font-weight: 600;
+  color: var(--text);
+  line-height: 1.2;
+}
+.po-metric-value.po-metric-md { font-size: 0.95rem; padding-top: 3px; }
+.po-metric-total { font-size: 0.85rem; color: var(--muted); font-weight: 400; }
+.po-metric-sub { font-size: 0.7rem; color: #4a6fa5; margin-top: 2px; }
+.po-progress {
+  height: 5px;
+  border-radius: 3px;
+  background: #bfdbfe;
+  overflow: hidden;
+  margin-top: 7px;
+}
+.po-progress-fill {
+  height: 100%;
+  border-radius: 3px;
+  background: var(--primary);
+  transition: width .3s ease;
+}
+
+/* 메인 그리드 */
+.po-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 12px;
+  margin-bottom: 12px;
+}
+.po-right-col { display: flex; flex-direction: column; gap: 12px; }
+
+/* 카드 */
+.po-card {
+  background: var(--surface);
+  border: 1px solid #dbeafe;
+  border-radius: var(--radius);
+  padding: 14px 16px;
+}
+.po-section-title {
+  font-size: 0.7rem;
+  font-weight: 600;
+  color: #4a6fa5;
+  text-transform: uppercase;
+  letter-spacing: .06em;
+  margin-bottom: 10px;
+}
+
+/* 체크리스트 */
+.po-check-item {
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+  padding: 7px 0;
+  border-bottom: 1px solid #eff6ff;
+  font-size: 0.82rem;
+}
+.po-check-item:last-child { border-bottom: none; }
+.po-check-box {
+  width: 16px;
+  height: 16px;
+  border-radius: 3px;
+  border: 1.5px solid #93c5fd;
+  flex-shrink: 0;
+  margin-top: 1px;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: #fff;
+  transition: background .15s, border-color .15s;
+}
+.po-check-box.done {
+  background: #dbeafe;
+  border-color: var(--primary);
+}
+.po-check-box.done::after {
+  content: '';
+  width: 8px;
+  height: 5px;
+  border-left: 1.5px solid var(--primary);
+  border-bottom: 1.5px solid var(--primary);
+  transform: rotate(-45deg) translate(1px, -1px);
+}
+.po-role-tag {
+  display: inline-block;
+  font-size: 0.68rem;
+  padding: 1px 5px;
+  border-radius: 4px;
+  background: #eff6ff;
+  color: #1e40af;
+  margin-top: 2px;
+}
+
+/* 확인 필요사항 */
+.po-q-item {
+  display: flex;
+  gap: 8px;
+  padding: 7px 0;
+  border-bottom: 1px solid #eff6ff;
+  font-size: 0.82rem;
+  align-items: flex-start;
+}
+.po-q-item:last-child { border-bottom: none; }
+.po-q-icon {
+  width: 17px;
+  height: 17px;
+  border-radius: 50%;
+  background: #fef3c7;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  font-size: 9px;
+  font-weight: 700;
+  color: #92400e;
+  margin-top: 1px;
+}
+
+/* 역할별 담당 */
+.po-role-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 6px 0;
+  border-bottom: 1px solid #eff6ff;
+  font-size: 0.82rem;
+  gap: 8px;
+}
+.po-role-row:last-child { border-bottom: none; }
+.po-role-name { color: var(--text); }
+.po-role-owner { color: var(--muted); font-size: 0.78rem; }
+
+/* 배지 */
+.po-badge {
+  display: inline-block;
+  font-size: 0.68rem;
+  font-weight: 500;
+  padding: 2px 8px;
+  border-radius: 20px;
+  white-space: nowrap;
+}
+.po-badge-assigned { background: #dbeafe; color: #1e40af; }
+.po-badge-unassigned { background: #fef9c3; color: #854d0e; }
+.po-badge-tbd { background: #f1f5f9; color: #64748b; }
+
+/* 생성 폴더 */
+.po-folder-item {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 4px 0;
+  font-size: 0.8rem;
+  color: #334155;
+}
+.po-folder-icon { font-size: 0.85rem; flex-shrink: 0; }
+
+/* 리마인드 */
+.po-reminder-track {
+  display: flex;
+  border-radius: 6px;
+  overflow: hidden;
+  border: 1px solid #dbeafe;
+}
+.po-reminder-phase {
+  flex: 1;
+  padding: 10px 12px;
+  border-right: 1px solid #dbeafe;
+  background: #f8fbff;
+}
+.po-reminder-phase:last-child { border-right: none; background: #f8fbff; }
+.po-reminder-phase.urgent {
+  background: #fef2f2;
+  border-right-color: #fecaca;
+}
+.po-reminder-when { font-size: 0.7rem; color: #4a6fa5; margin-bottom: 3px; }
+.po-reminder-phase.urgent .po-reminder-when { color: #c0392b; }
+.po-reminder-cadence { font-size: 0.82rem; font-weight: 600; color: var(--text); }
+.po-reminder-phase.urgent .po-reminder-cadence { color: #c0392b; }
+.po-reminder-target { font-size: 0.7rem; color: var(--muted); margin-top: 2px; }
+.po-reminder-phase.urgent .po-reminder-target { color: #e57373; }
+
+/* ── (기존) announcement-agent-panel ─────────────── */
 .announcement-agent-panel {
   padding: 18px;
   border-radius: var(--radius);

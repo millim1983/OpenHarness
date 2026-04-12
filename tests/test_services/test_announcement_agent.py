@@ -18,11 +18,12 @@ def test_run_announcement_agent_creates_project_folder_and_workbooks(tmp_path: P
             file_bytes=b"pdf bytes",
             output_root=tmp_path,
             structured_analysis={
-                "metadata": {"agency": "한국산업기술진흥원", "ministry": "MOTIE"},
                 "announcement_overview": {
                     "title": "AI Product Support",
                     "main_purpose": "Commercialization",
                     "project_type": "R&D",
+                    "ministry": "산업통상자원부",
+                    "professional_agency": "한국산업기술진흥원",
                 },
                 "application_schedule": {"submission_deadline": "2026-05-01 18:00"},
                 "submission_channel": {
@@ -52,6 +53,7 @@ def test_run_announcement_agent_creates_project_folder_and_workbooks(tmp_path: P
     project_dir = Path(result["project_dir"])
     assert project_dir.exists()
     assert result["folder_name"].startswith("260501-KIAT-AI_Product_Support")
+    assert result["monitoring_row"]["ministry"] == "산업통상자원부"
     assert result["monitoring_row"]["agency"] == "KIAT"
     assert result["monitoring_row"]["business_domain"] == "Commercialization"
     assert Path(result["saved_source_files"][0]).read_bytes() == b"pdf bytes"
@@ -82,8 +84,7 @@ def test_run_announcement_agent_uses_full_agency_name_when_alias_missing(
             file_bytes=b"pdf bytes",
             output_root=tmp_path,
             structured_analysis={
-                "metadata": {"ordering_agency": "서울특별시"},
-                "announcement_overview": {"title": "Smart City SI"},
+                "announcement_overview": {"title": "Smart City SI", "ordering_agency": "서울특별시"},
                 "application_schedule": {"submission_deadline": "2026.06.02 15:00"},
             },
         )

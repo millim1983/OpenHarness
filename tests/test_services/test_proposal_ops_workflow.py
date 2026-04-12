@@ -43,4 +43,6 @@ def test_build_proposal_ops_preview_from_announcement_analysis() -> None:
     assert preview["submission_checklist"][1]["item"] == "Application form"
     assert preview["manager_questions"][0]["question"] == "Confirm online portal account owner"
     assert preview["role_tasks"][0]["owner"] == "Ops Lead"
-    assert preview["folder_plan"][0].startswith("proposal_ops/")
+    # 폴더 루트는 {deadline_yymmdd}-{agency_label}-{project_name} 패턴
+    folder_root_part = preview["folder_plan"][0].split("/")[0]
+    assert folder_root_part.startswith("260501-"), f"unexpected folder root: {folder_root_part}"

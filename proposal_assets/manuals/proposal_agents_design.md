@@ -472,3 +472,80 @@ class AnnouncementAnalysis:
 6. **역할 위임 지원 (컨소시엄 확장 대비)**
    담당자 이름 하드코딩 금지 — 항상 `role_assignments` 테이블 참조
    향후 컨소시엄사 참여 시 role 재배정만으로 알림·권한 자동 전환
+
+---
+
+## 변경 이력
+
+### 2026-04-13 — proposal_ops config 연동 (하드코딩 제거)
+
+**배경**
+`proposal_ops.py`에 폴더 구조, 역할/담당자, 폴더명 패턴이 모두 하드코딩되어 있어
+`proposal_assets/config/` 하위 파일들과 실제 동작이 따로 놀고 있었음.
+
+**수정 내용**
+
+| 항목 | 이전 | 이후 |
+|------|------|------|
+| 폴더 구조 | `DEFAULT_FOLDER_TEMPLATE` 하드코딩 | `folder_tree.json` → `announcement_project_folders` 로드 |
+| 역할/담당자 | `DEFAULT_ROLE_TASKS` 하드코딩 | `role_book.json` → `roles` 로드 (fallback 유지) |
+| 폴더 루트 패턴 | `proposal_ops/{year}_{title}` | `folder_rules.json` 패턴 → `{deadline_yymmdd}-{agency_label}-{project_name}` |
+| 기관 약자 | 미적용 | `agency_aliases.json` 조회 후 alias로 치환 |
+
+**로드 우선순위 (role_tasks)**
+1. 공고 분석 결과의 `team_assignments`
+2. `team_context` 힌트
+3. `role_book.json` (config)
+4. `_FALLBACK_ROLE_TASKS` (코드 내 최후 방어값)
+
+**폴더 루트 생성 규칙**
+- `deadline` → `yymmdd` 포맷 파싱 (여러 날짜 포맷 시도)
+- agency 필드 탐색 순서: `folder_rules.json`의 `agency_source_fields` 순
+- 기관명이 `agency_aliases.json`에 있으면 alias 사용, 없으면 safe_path_segment 처리
+
+**영향 범위**
+- `src/openharness/services/workflows/proposal_ops.py`
+- `tests/test_services/test_proposal_ops_workflow.py` (폴더 루트 패턴 검증 업데이트)
+
+---
+
+### 2026-04-13 — 제안 운영 UI 대시보드 개발
+
+**배경**
+기존 `<pre>` 태그 텍스트 출력에서 카드형 대시보드 UI로 전환.
+사용자 제공 프로토타입(`_refs/prototypes/20260413_proposal_ops_dashboard.html`) 기반.
+
+**수정 파일**
+
+| 파일 | 변경 내용 |
+|------|----------|
+| `frontend/web/index.html` | `proposalOpsView` 전체 재구성 → 대시보드 구조 |
+| `frontend/web/styles.css` | `.po-*` 대시보드 스타일 추가 (흰 배경 + 블루 계열) |
+| `frontend/web/app.js` | `formatProposalOpsPlan` 제거 → `renderProposalOpsDashboard` 교체 |
+
+**UI 구성**
+
+```
+헤더: 프로젝트명 + D-day 카운트다운
+────────────────────────────────
+지표 3종: 제출서류 진행률 | 역할배정 현황 | 사업유형
+────────────────────────────────
+좌: 제출 체크리스트 (인터랙티브 체크박스)
+우: 확인 필요사항 / 역할별 담당 / 생성 폴더
+────────────────────────────────
+리마인드 일정 (일반 구간 / D-3 긴급 구간)
+```
+
+**데이터 → UI 매핑**
+- `project_summary` → 헤더, 지표
+- `submission_checklist` → 체크리스트 + 진행률 바
+- `manager_questions` → 확인 필요사항
+- `role_tasks` → 역할별 담당 (label + owner + 배정 상태 배지)
+- `folder_plan` → 생성 폴더 (경로 마지막 segment 표시)
+- `reminder_plan` → 리마인드 일정 (deadline_watch 단계 긴급 강조)
+
+**빈 상태 처리**
+데이터 없을 때 `.po-empty` 노출, 데이터 수신 시 `.po-content` 전환
+
+**디자인 컬러**
+흰 배경(`#ffffff`) + 블루 계열(`#0071e3`, `#dbeafe`, `#eff6ff`)

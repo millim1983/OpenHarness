@@ -6,9 +6,7 @@ import zipfile
 import pytest
 
 from openharness.services.document_processing import (
-    MAX_SUMMARY_SOURCE_CHARS,
     build_document_analysis_prompt,
-    build_document_summary_prompt,
     extract_text_from_document,
     format_document_analysis_summary,
     parse_document_analysis_response,
@@ -47,36 +45,20 @@ def test_extract_text_rejects_unknown_binary_file() -> None:
         extract_text_from_document("archive.bin", b"\x00\xff\x00\xff")
 
 
-def test_build_document_summary_prompt_marks_truncation() -> None:
-    prompt, truncated = build_document_summary_prompt(
-        "long.txt",
-        "x" * (MAX_SUMMARY_SOURCE_CHARS + 10),
-        "Focus on deadlines.",
-    )
-
-    assert truncated is True
-    assert "Focus on deadlines." in prompt
-    assert "[Truncated for MVP summarization]" in prompt
-
-
-def test_build_document_summary_prompt_rejects_empty_text() -> None:
-    with pytest.raises(ValueError, match="did not contain extractable text"):
-        build_document_summary_prompt("empty.txt", "   ")
-
-
-def test_build_document_analysis_prompt_marks_truncation() -> None:
+def test_build_document_analysis_prompt_never_truncates() -> None:
+    long_text = "x" * 100_000
     prompt, truncated = build_document_analysis_prompt(
         "roadmap.txt",
-        "x" * (MAX_SUMMARY_SOURCE_CHARS + 25),
+        long_text,
         "Focus on owners and deadlines.",
         "Alex PM: schedule management, final submission",
     )
 
-    assert truncated is True
+    assert truncated is False
     assert "Return only valid JSON" in prompt
     assert "Focus on owners and deadlines." in prompt
     assert "Alex PM: schedule management, final submission" in prompt
-    assert "[Truncated for MVP analysis]" in prompt
+    assert long_text in prompt
 
 
 def test_parse_document_analysis_response_normalizes_missing_fields() -> None:

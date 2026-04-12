@@ -340,28 +340,36 @@ def _run_document_summary(
         raise ValueError("Uploaded file is too large for the MVP limit (2 MB).")
 
     extracted_text = extract_text_from_document(filename, file_bytes)
-    workflow_result = run_announcement_analysis(
-        DocumentWorkflowRequest(
-            profile_name=profile_name,
-            file_name=filename,
-            extracted_text=extracted_text,
-            system_prompt=system_prompt,
-            instruction=instruction,
-            team_context=team_context,
-        ),
-        cwd=str(REPO_ROOT),
-    )
+
+    # Index into VectorDB first so chunks are available as the analysis source
     rag_status = _index_document_for_rag(
         chat_profile_name=profile_name,
         file_name=filename,
         extracted_text=extracted_text,
         instruction=instruction,
         team_context=team_context,
-        structured_analysis=workflow_result.structured,
         system_prompt=system_prompt,
     )
     store = RagStore.for_project(REPO_ROOT)
     document_id = int(rag_status["indexed_document_id"])
+
+    # Assemble all indexed chunks in order as the authoritative analysis source
+    chunks = store.load_chunks_for_document(document_id)
+    analysis_source = (
+        "\n\n".join(c.text for c in chunks) if chunks else extracted_text
+    )
+
+    workflow_result = run_announcement_analysis(
+        DocumentWorkflowRequest(
+            profile_name=profile_name,
+            file_name=filename,
+            extracted_text=analysis_source,
+            system_prompt=system_prompt,
+            instruction=instruction,
+            team_context=team_context,
+        ),
+        cwd=str(REPO_ROOT),
+    )
     store.upsert_document_artifact(
         document_id,
         extracted_text=extracted_text,
@@ -369,6 +377,20 @@ def _run_document_summary(
         structured=workflow_result.structured,
         workflow_name=workflow_result.workflow_name,
         prompt_source_truncated=workflow_result.prompt_source_truncated,
+    )
+    # Patch metadata with structured analysis fields (title, ministry, agency, etc.)
+    store.patch_document_metadata(
+        document_id,
+        build_rag_document_metadata(
+            file_name=filename,
+            extracted_text=extracted_text,
+            embedding_profile=str(rag_status.get("embedding_profile", "")),
+            chat_profile=profile_name,
+            instruction=instruction,
+            has_team_context=bool(team_context.strip()),
+            source_kind="web_mvp_upload",
+            structured_analysis=workflow_result.structured,
+        ),
     )
     proposal_ops = build_proposal_ops_preview(
         ProposalOpsRequest(
@@ -457,28 +479,36 @@ def _run_announcement_agent_bundle(
             str(notice_file["file_name"]), bytes(notice_file["file_bytes"])
         )
         notice_file["extracted_text"] = notice_text
-    workflow_result = run_announcement_analysis(
-        DocumentWorkflowRequest(
-            profile_name=profile_name,
-            file_name=str(notice_file["file_name"]),
-            extracted_text=notice_text,
-            system_prompt=system_prompt,
-            instruction=instruction,
-            team_context=team_context,
-        ),
-        cwd=str(REPO_ROOT),
-    )
+
+    # Index into VectorDB first so chunks are available as the analysis source
     rag_status = _index_document_for_rag(
         chat_profile_name=profile_name,
         file_name=str(notice_file["file_name"]),
         extracted_text=notice_text,
         instruction=instruction,
         team_context=team_context,
-        structured_analysis=workflow_result.structured,
         system_prompt=system_prompt,
     )
     store = RagStore.for_project(REPO_ROOT)
     document_id = int(rag_status["indexed_document_id"])
+
+    # Assemble all indexed chunks in order as the authoritative analysis source
+    chunks = store.load_chunks_for_document(document_id)
+    analysis_source = (
+        "\n\n".join(c.text for c in chunks) if chunks else notice_text
+    )
+
+    workflow_result = run_announcement_analysis(
+        DocumentWorkflowRequest(
+            profile_name=profile_name,
+            file_name=str(notice_file["file_name"]),
+            extracted_text=analysis_source,
+            system_prompt=system_prompt,
+            instruction=instruction,
+            team_context=team_context,
+        ),
+        cwd=str(REPO_ROOT),
+    )
     structured = _structured_with_rag_metadata(
         workflow_result.structured,
         store.get_document_metadata(document_id),
@@ -490,6 +520,20 @@ def _run_announcement_agent_bundle(
         structured=structured,
         workflow_name=workflow_result.workflow_name,
         prompt_source_truncated=workflow_result.prompt_source_truncated,
+    )
+    # Patch metadata with structured analysis fields (title, ministry, agency, etc.)
+    store.patch_document_metadata(
+        document_id,
+        build_rag_document_metadata(
+            file_name=str(notice_file["file_name"]),
+            extracted_text=notice_text,
+            embedding_profile=str(rag_status.get("embedding_profile", "")),
+            chat_profile=profile_name,
+            instruction=instruction,
+            has_team_context=bool(team_context.strip()),
+            source_kind="web_mvp_upload",
+            structured_analysis=structured,
+        ),
     )
     proposal_ops = build_proposal_ops_preview(
         ProposalOpsRequest(

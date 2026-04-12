@@ -703,3 +703,87 @@ Operational rule:
 Remaining next steps:
 - Decide whether the filter UI should stay free-form or derive selectable values from indexed document metadata.
 - Add a cleanup/reset affordance for smoke-test documents or document-level test fixtures if this dashboard becomes a regular manual QA surface.
+
+---
+
+## 2026-04-13 VectorDB-First Flow / 추출 스키마 Config화 / 제안 운영 대시보드
+
+### 배경
+공고 PDF 업로드 후 마감일·제출서류 등 핵심 필드가 제대로 추출되지 않는 문제가 반복 보고됨.
+원인 분석 결과 두 가지 구조적 문제 확인:
+1. 문서 원문이 VectorDB 청크 분할 전에 LLM에게 전달되었고, 이 과정에서 텍스트가 잘려 나갈 수 있었음.
+2. 추출 대상 필드 정의가 소스 코드에 하드코딩되어 있어 수정이 어려웠음.
+
+---
+
+### 변경 사항
+
+#### VectorDB-First 처리 순서 변경 (`scripts/web_mvp_server.py`)
+`_run_document_summary` / `_run_announcement_agent_bundle` 양쪽에서 처리 순서를 재구성:
+
+**기존 순서:**
+1. 텍스트 추출
+2. LLM 분석 (truncation 가능)
+3. VectorDB 인덱싱
+
+**변경 후 순서:**
+1. 텍스트 추출
+2. **VectorDB 인덱싱 먼저** (청크 분할 + 임베딩)
+3. **청크 전체 조립** (`chunk_index` 순 정렬 → `"\n\n".join(...)`)
+4. 조립된 텍스트로 LLM 분석 (잘림 없음, 전체 원문 보장)
+5. `upsert_document_artifact`로 분석 결과 저장
+6. `patch_document_metadata`로 title·ministry·agency 등 메타데이터 갱신
+
+이 구조로 "한번 읽었으면 또 읽게 하지 않는다"는 원칙을 실현함.
+
+#### `RagStore.patch_document_metadata()` 신규 추가 (`src/openharness/services/rag_store.py`)
+청크를 건드리지 않고 `documents.metadata_json`만 in-place 업데이트하는 메서드 추가.
+인덱싱 직후에는 structured 분석 결과가 없으므로 title/ministry/agency 등이 비어 있다가,
+분석 완료 후 이 메서드로 메타데이터를 보완함. RAG 필터링 정확도 유지를 위해 필요.
+
+#### 추출 스키마 Config화 (`proposal_assets/config/extraction_schema.json` 신규)
+LLM에 전달하는 추출 필드 정의와 추출 규칙을 소스 코드 바깥으로 분리.
+- 11개 섹션 전체 필드 정의 (한국어 힌트 포함)
+- `extraction_rules` 배열: 날짜 포맷(YYYY-MM-DD HH:MM), required_for 허용값, 제출서류 전체 추출 등
+- 항목 추가·수정 시 이 파일만 편집하면 됨 (코드 변경 불필요)
+
+`document_processing.py`에서 `_load_extraction_schema()` (`lru_cache`) 로 로드,
+`build_document_analysis_prompt()`가 스키마 기반 프롬프트를 생성하며 truncation을 제거(`truncated=False` 고정).
+
+#### 제안 운영 대시보드 UI 개선 (`frontend/web/`)
+`proposalOpsView` 영역을 `<pre>` 출력에서 구조화된 대시보드로 교체:
+- `.po-*` CSS 클래스 체계 신규 추가 (흰 배경 + 블루 계열)
+- `renderProposalOpsDashboard(plan)` JS 함수가 메트릭, 역할별 체크리스트, 폴더 구조, 리마인더를 카드 레이아웃으로 렌더링
+- 체크리스트 onclick 버그 수정: 인라인 `.toString()` 방식 → `window._poUpdateChecklist` 전역 참조 방식으로 변경
+- `id="announcementAgentMeta"` 위치 오류 수정: `proposalOpsView` 내부 → `announcementAgentView` 내부로 이동
+
+#### `proposal_ops.py` Config 연동 (`src/openharness/services/workflows/proposal_ops.py`)
+`lru_cache` 기반 로더 4개 추가:
+- `_load_folder_template()` ← `folder_tree.json`
+- `_load_role_book()` ← `role_book.json`
+- `_load_agency_aliases()` ← `agency_aliases.json`
+- `_load_folder_rules()` ← `folder_rules.json`
+
+폴더명 패턴 `{deadline_yymmdd}-{agency_label}-{project_name}` 동적 생성 구현.
+역할별 태스크도 `role_book.json` 기반으로 동적 로드.
+
+#### `announcement_agent.py` 필드 경로 버그 수정
+`_agency_folder_label()` 및 `_monitoring_row()` 에서 존재하지 않는
+`structured["metadata"]` 딕셔너리를 참조하던 버그 수정.
+→ `structured["announcement_overview"]["professional_agency"]` 등 정확한 경로로 변경.
+
+#### `_refs/` 참조 자료 폴더 신설
+- `_refs/CONVENTIONS.md`: 파일 명명 규칙 정의 (`{YYYYMMDD}_{service}_{description}.{ext}`)
+- `_refs/prototypes/20260413_proposal_ops_dashboard.html`: 제안 운영 대시보드 UI 프로토타입 보관
+
+#### 테스트 정비
+- `test_announcement_agent.py`: `metadata.agency` → `announcement_overview.professional_agency` 로 테스트 데이터 수정
+- `test_web_mvp_rag.py`: 동일 경로 수정 + 신규 흐름 호환 확인
+- `test_document_processing.py`: 삭제된 `build_document_summary_prompt` / `MAX_SUMMARY_SOURCE_CHARS` 참조 제거, truncation 미발생 검증으로 교체
+
+---
+
+### 아키텍처 원칙 (이번 변경에서 확립)
+- **문서는 한 번만 읽는다**: 텍스트 추출 후 VectorDB 인덱싱 → 청크에서 분석 소스 조립.
+- **추출 대상 필드는 코드 바깥에서 관리**: `extraction_schema.json`으로 유지보수.
+- **메타데이터는 두 단계로 완성**: 인덱싱 시 기본값 → 분석 완료 후 `patch_document_metadata`로 보완.

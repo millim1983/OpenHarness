@@ -284,14 +284,12 @@ def test_run_announcement_agent_bundle_handles_folder_upload(
             workflow_name="announcement_analysis",
             summary="Bundle summary",
             structured={
-                "metadata": {
-                    "agency": "정보통신기획평가원",
-                    "ministry": "MSIT",
-                    "business_domain": "AI",
-                },
                 "announcement_overview": {
                     "title": "AI Platform",
                     "project_type": "R&D",
+                    "ministry": "과학기술정보통신부",
+                    "professional_agency": "정보통신기획평가원",
+                    "main_purpose": "AI",
                 },
                 "application_schedule": {"submission_deadline": "2026-07-03 18:00"},
             },
@@ -325,7 +323,7 @@ def test_run_announcement_agent_bundle_handles_folder_upload(
     assert result["file_count"] == 2
     assert result["primary_file_name"] == "공고.pdf"
     assert result["primary_relative_path"] == "upload_set/공고.pdf"
-    assert result["structured"]["metadata"]["agency"] == "정보통신기획평가원"
+    assert result["structured"]["announcement_overview"]["professional_agency"] == "정보통신기획평가원"
     assert extracted_file_names == ["공고.pdf"]
     assert len(result["announcement_agent"]["saved_source_files"]) == 2
     assert (project_dir / "upload_set" / "forms" / "form.hwp").exists()
@@ -338,7 +336,7 @@ def test_run_announcement_agent_bundle_handles_folder_upload(
     assert result["announcement_agent"]["monitoring_row"]["agency"] == "IITP"
     assert result["rag"]["indexed_document_count"] == 1
     detail = module._get_rag_document_detail(result["rag"]["indexed_document_id"])
-    assert detail["structured"]["metadata"]["agency"] == "정보통신기획평가원"
+    assert detail["structured"]["announcement_overview"]["professional_agency"] == "정보통신기획평가원"
     assert result["attachment_files"][0]["role"] == "notice_pdf"
     assert result["attachment_files"][1]["role"] == "attachment"
     assert result["attachment_files"][1]["indexed"] is False

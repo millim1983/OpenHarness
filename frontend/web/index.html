@@ -203,17 +203,83 @@
           </section>
 
           <section id="proposalOpsView" class="workspace-view" data-view="proposal-ops">
-            <section class="proposal-ops-panel">
-              <div class="response-header">
-                <h2>제안 운영</h2>
-                <button id="copyProposalOpsButton" class="ghost-button" type="button">복사</button>
+            <div class="po-dashboard">
+
+              <!-- 빈 상태 -->
+              <div class="po-empty" id="proposalOpsEmpty">
+                <div class="po-empty-icon">📋</div>
+                <p>공고 에이전트를 실행하면<br>제안 운영 계획이 여기에 표시됩니다.</p>
               </div>
-              <p class="helper-text">
-                문서 처리에서 공고를 업로드하고 분석한 뒤, 실행 전 운영 계획을 여기서 검토합니다.
-              </p>
-              <div class="proposal-agent-meta" id="announcementAgentMeta">아직 생성된 파일이 없습니다.</div>
-              <pre id="proposalOpsOutput">아직 제안 운영 계획이 없습니다.</pre>
-            </section>
+
+              <!-- 대시보드 (데이터 도착 후 표시) -->
+              <div class="po-content" id="proposalOpsContent" hidden>
+
+                <!-- 헤더 -->
+                <div class="po-header">
+                  <div class="po-title-block">
+                    <div class="po-eyebrow">공고 에이전트 · 제안 운영</div>
+                    <div class="po-title" id="poTitle"></div>
+                    <div class="po-meta" id="poMeta"></div>
+                  </div>
+                  <div class="po-countdown-block">
+                    <div class="po-countdown" id="poCountdown">—</div>
+                    <div class="po-countdown-label" id="poCountdownLabel">마감일 확인 필요</div>
+                  </div>
+                </div>
+
+                <!-- 지표 카드 3종 -->
+                <div class="po-metrics">
+                  <div class="po-metric">
+                    <div class="po-metric-label">제출 서류</div>
+                    <div class="po-metric-value">
+                      <span id="poDoneCount">0</span><span class="po-metric-total" id="poTotalCount">/0</span>
+                    </div>
+                    <div class="po-progress"><div class="po-progress-fill" id="poProgressFill" style="width:0%"></div></div>
+                  </div>
+                  <div class="po-metric">
+                    <div class="po-metric-label">역할 배정</div>
+                    <div class="po-metric-value po-metric-md" id="poRoleCount">—</div>
+                    <div class="po-metric-sub" id="poRoleSub"></div>
+                  </div>
+                  <div class="po-metric">
+                    <div class="po-metric-label">사업 유형</div>
+                    <div class="po-metric-value po-metric-md" id="poBusinessType">—</div>
+                    <div class="po-metric-sub" id="poChannel"></div>
+                  </div>
+                </div>
+
+                <!-- 메인 그리드 -->
+                <div class="po-grid">
+                  <!-- 좌: 체크리스트 -->
+                  <div class="po-card">
+                    <div class="po-section-title">제출 체크리스트</div>
+                    <div id="poChecklist"></div>
+                  </div>
+                  <!-- 우: 확인사항 + 역할 + 폴더 -->
+                  <div class="po-right-col">
+                    <div class="po-card">
+                      <div class="po-section-title">확인 필요사항</div>
+                      <div id="poQuestions"></div>
+                    </div>
+                    <div class="po-card">
+                      <div class="po-section-title">역할별 담당</div>
+                      <div id="poRoles"></div>
+                    </div>
+                    <div class="po-card">
+                      <div class="po-section-title">생성 폴더</div>
+                      <div id="poFolders"></div>
+                    </div>
+                  </div>
+                </div>
+
+                <!-- 리마인드 -->
+                <div class="po-card">
+                  <div class="po-section-title">리마인드 일정</div>
+                  <div class="po-reminder-track" id="poReminder"></div>
+                </div>
+
+              </div><!-- /po-content -->
+            </div><!-- /po-dashboard -->
           </section>
 
           <section id="announcementAgentView" class="workspace-view" data-view="announcement-agent">
@@ -248,6 +314,8 @@
                 <button id="saveAnnouncementFeedbackButton" class="ghost-button" type="button">피드백 저장</button>
                 <p class="helper-text">입력한 피드백은 저장되며, 실행 시 지시문에도 함께 전달됩니다.</p>
               </div>
+
+              <div class="announcement-agent-meta" id="announcementAgentMeta" style="display:none"></div>
 
               <div class="announcement-results">
                 <section class="response-panel">

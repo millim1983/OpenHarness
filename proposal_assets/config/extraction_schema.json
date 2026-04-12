@@ -1,0 +1,112 @@
+{
+  "version": "1.0",
+  "description": "공고 구조화 추출 스키마. 에이전트들이 참조할 필드 정의. 항목 추가/수정 시 이 파일만 업데이트하면 됩니다.",
+  "sections": {
+    "announcement_overview": {
+      "label": "공고 기본정보",
+      "fields": {
+        "title":               "공고명 또는 과제명 (전체 공식 명칭)",
+        "main_purpose":        "사업 목적 (1-2문장 요약)",
+        "project_type":        "사업 유형 (예: R&D, 비R&D, 용역, 지원사업)",
+        "support_summary":     "지원 내용 요약 (지원 규모, 대상, 방식 포함)",
+        "ministry":            "주관부처 전체 명칭 (예: 과학기술정보통신부, 산업통상자원부)",
+        "professional_agency": "전문기관/전담기관 전체 한글 명칭 (예: 한국산업기술진흥원). 문서에 명시된 경우만 입력.",
+        "dedicated_agency":    "전담기관 명칭. professional_agency와 다른 경우에만 입력, 동일하면 빈 문자열.",
+        "ordering_agency":     "발주처 또는 주관부처. ministry와 다른 경우에만 입력.",
+        "client":              "수요기관 또는 위탁기관. 명시된 경우에만 입력."
+      }
+    },
+    "consortium_requirements": {
+      "label": "컨소시엄 구성 요건",
+      "fields": {
+        "consortium_required":       "컨소시엄 필수 여부 (boolean)",
+        "demand_company_required":   "수요기업 참여 필수 여부 (boolean)",
+        "lead_org_allowed":          "주관기관 가능 기관 유형 목록 (예: [\"기업\", \"대학\", \"연구소\"])",
+        "partner_org_allowed":       "공동기관 가능 기관 유형 목록",
+        "subcontractor_allowed":     "위탁 허용 여부 (boolean)",
+        "notes":                     "컨소시엄 관련 주요 조건 또는 제약사항 목록"
+      }
+    },
+    "eligibility_by_role": {
+      "label": "역할별 참여 자격",
+      "note": "각 역할(주관, 공동, 위탁 등)별 자격 조건 배열"
+    },
+    "recommended_consortium_strategy": {
+      "label": "컨소시엄 구성 전략 (추천)",
+      "note": "공고 내용 기반 추천 전략. 사실이 아닌 제안임을 구분할 것."
+    },
+    "budget": {
+      "label": "예산",
+      "fields": {
+        "total_amount":           "과제당 총 연구비 (단위 포함, 예: '5억원')",
+        "by_year":                "연차별 연구비 목록",
+        "matching_requirement":   "기관부담금 또는 매칭 요건 (예: '현금 13% 이상')",
+        "additional_info_needed": "예산 관련 추가 확인 필요 사항 목록"
+      }
+    },
+    "submission_documents": {
+      "label": "제출서류",
+      "note": "공고의 제출서류/구비서류/제출목록 테이블의 모든 항목을 빠짐없이 추출",
+      "fields": {
+        "document_name":   "서류명 (원문 그대로)",
+        "required_for":    "제출 의무 기관 역할. 반드시 다음 값만 사용: '주관', '공동', '위탁', '수요'. 전체 해당이면 해당되는 값 모두 포함.",
+        "provided_form":   "양식 제공 여부 (boolean)",
+        "issuance_source": "발급처 또는 양식 출처",
+        "notes":           "비고 또는 조건"
+      }
+    },
+    "presentation": {
+      "label": "발표 평가",
+      "fields": {
+        "required": "발표 평가 필요 여부 (boolean)",
+        "notes":    "발표 관련 세부사항"
+      }
+    },
+    "application_schedule": {
+      "label": "접수 일정",
+      "fields": {
+        "announcement_date":   "공고일",
+        "start_at":            "접수 시작일",
+        "end_at":              "접수 종료일",
+        "submission_deadline": "최종 접수/제출 마감일시. 접수마감, 신청마감, 제출마감 등에서 추출. YYYY-MM-DD HH:MM 형식으로 정규화. 반드시 이 필드에 입력하고 end_at에만 넣지 말 것.",
+        "important_milestones": "주요 일정 목록 (공고 외 중간 마감, 발표일 등)"
+      }
+    },
+    "submission_channel": {
+      "label": "제출 방법",
+      "fields": {
+        "method":              "제출 방식 (예: '온라인', '우편', 'IRIS')",
+        "portal_or_address":   "제출 포털 URL 또는 주소",
+        "notes":               "제출 방법 관련 세부사항"
+      }
+    },
+    "contacts": {
+      "label": "문의처",
+      "note": "공고 문서의 문의처/담당자 정보 전체 목록"
+    },
+    "risks_and_checks": {
+      "label": "리스크 및 확인사항",
+      "fields": {
+        "compliance_risks":    "참여 자격, 예산, 서류 관련 컴플라이언스 리스크 목록",
+        "missing_information": "공고에서 확인되지 않아 추가 문의가 필요한 사항 목록",
+        "go_no_go_checks":     "참여 결정 전 반드시 확인해야 할 체크 항목 목록"
+      }
+    },
+    "internal_execution_plan": {
+      "label": "내부 실행 계획",
+      "fields": {
+        "team_assignments":         "팀 컨텍스트가 제공된 경우에만 역할 배정. 없으면 빈 배열.",
+        "immediate_next_actions":   "즉시 실행 필요한 액션 목록 (최대 5개)"
+      }
+    }
+  },
+  "extraction_rules": [
+    "공고 원문에 있는 사실만 추출하고, 없는 정보는 빈 문자열 또는 빈 배열로 남길 것.",
+    "submission_documents: 제출서류 목록 테이블의 모든 행을 누락 없이 추출할 것.",
+    "submission_deadline: 문서 어딘가에 마감일이 있으면 반드시 YYYY-MM-DD HH:MM 형식으로 추출할 것.",
+    "required_for 값은 반드시 '주관', '공동', '위탁', '수요' 중에서만 사용할 것.",
+    "professional_agency: 전문기관/전담기관 전체 한글 명칭을 원문 그대로 입력할 것.",
+    "컨소시엄 전략 추천은 사실 추출과 명확히 구분할 것.",
+    "팀 컨텍스트가 없으면 team_assignments는 빈 배열로 둘 것."
+  ]
+}

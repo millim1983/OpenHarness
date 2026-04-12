@@ -3,10 +3,10 @@
   "deadline_source_fields": ["submission_deadline", "end_at"],
   "deadline_format": "yymmdd",
   "agency_source_fields": [
-    "agency",
     "professional_agency",
     "dedicated_agency",
     "ordering_agency",
+    "agency",
     "client"
   ],
   "unknown_deadline_label": "마감일확인",

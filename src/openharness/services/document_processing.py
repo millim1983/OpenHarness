@@ -4,12 +4,27 @@ from __future__ import annotations
 
 import io
 import json
+import logging
 import zipfile
+from functools import lru_cache
 from pathlib import Path
 from xml.etree import ElementTree
 
+logger = logging.getLogger(__name__)
 
-MAX_SUMMARY_SOURCE_CHARS = 12000
+_EXTRACTION_SCHEMA_PATH = (
+    Path(__file__).parent.parent.parent.parent.parent
+    / "proposal_assets" / "config" / "extraction_schema.json"
+)
+
+
+@lru_cache(maxsize=1)
+def _load_extraction_schema() -> dict:
+    try:
+        return json.loads(_EXTRACTION_SCHEMA_PATH.read_text(encoding="utf-8"))
+    except Exception as exc:
+        logger.warning("extraction_schema.json 로드 실패, 기본값 사용: %s", exc)
+        return {}
 WORD_NAMESPACE = {"w": "http://schemas.openxmlformats.org/wordprocessingml/2006/main"}
 TEXT_EXTENSIONS = {
     ".csv",
@@ -45,44 +60,6 @@ def extract_text_from_document(filename: str, data: bytes) -> str:
         raise ValueError(f"Unsupported file type for text extraction: {suffix or 'unknown'}") from exc
 
 
-def build_document_summary_prompt(
-    filename: str,
-    extracted_text: str,
-    instruction: str = "",
-) -> tuple[str, bool]:
-    """Build a one-shot summary prompt from extracted document text."""
-    cleaned = extracted_text.strip()
-    if not cleaned:
-        raise ValueError("The uploaded file did not contain extractable text.")
-
-    truncated = len(cleaned) > MAX_SUMMARY_SOURCE_CHARS
-    source_text = cleaned[:MAX_SUMMARY_SOURCE_CHARS]
-    if truncated:
-        source_text += "\n\n[Truncated for MVP summarization]"
-
-    prompt_parts = [
-        "You are summarizing one uploaded document for a lightweight web MVP.",
-        f"Filename: {filename}",
-        "Task:",
-        "- Identify the document's main purpose.",
-        "- Summarize the most important points in 3-6 bullets.",
-        "- End with a short 'Recommended next action' line.",
-    ]
-    if instruction.strip():
-        prompt_parts.extend(
-            [
-                "Additional user instruction:",
-                instruction.strip(),
-            ]
-        )
-    prompt_parts.extend(
-        [
-            "Document text:",
-            source_text,
-        ]
-    )
-    return "\n".join(prompt_parts), truncated
-
 
 def build_document_analysis_prompt(
     filename: str,
@@ -91,70 +68,75 @@ def build_document_analysis_prompt(
     team_context: str = "",
     system_prompt: str = "",
 ) -> tuple[str, bool]:
-    """Build a one-shot structured analysis prompt from extracted document text."""
+    """Build a one-shot structured analysis prompt from extracted document text.
+
+    Uses extraction_schema.json for field definitions.
+    No character truncation — caller is responsible for providing full text
+    (assembled from VectorDB chunks or raw extraction).
+    """
     cleaned = extracted_text.strip()
     if not cleaned:
         raise ValueError("The uploaded file did not contain extractable text.")
 
-    truncated = len(cleaned) > MAX_SUMMARY_SOURCE_CHARS
-    source_text = cleaned[:MAX_SUMMARY_SOURCE_CHARS]
-    if truncated:
-        source_text += "\n\n[Truncated for MVP analysis]"
+    schema = _load_extraction_schema()
+    schema_json, rules = _build_schema_and_rules_from_config(schema)
 
     prompt_parts = [
-        "You are analyzing one uploaded government announcement for a lightweight web MVP.",
+        "You are analyzing one uploaded Korean government announcement document.",
         f"Filename: {filename}",
         "Return only valid JSON with this exact schema:",
-        '{'
-        '"announcement_overview": {"title": "string", "main_purpose": "string", "project_type": "string", "support_summary": "string"}, '
-        '"consortium_requirements": {"consortium_required": "boolean", "demand_company_required": "boolean", "lead_org_allowed": ["string"], "partner_org_allowed": ["string"], "subcontractor_allowed": "boolean", "notes": ["string"]}, '
-        '"eligibility_by_role": [{"role": "string", "eligible_entities": ["string"], "restrictions": ["string"]}], '
-        '"recommended_consortium_strategy": {"recommended_structure": ["string"], "recommended_role_rr": [{"role": "string", "recommended_entity_type": "string", "responsibilities": ["string"]}], "key_differentiators": ["string"]}, '
-        '"budget": {"total_amount": "string", "by_year": [{"year": "string", "amount": "string"}], "matching_requirement": "string", "additional_info_needed": ["string"]}, '
-        '"submission_documents": [{"document_name": "string", "required_for": ["string"], "provided_form": "boolean", "issuance_source": "string", "notes": "string"}], '
-        '"presentation": {"required": "boolean", "notes": "string"}, '
-        '"application_schedule": {"announcement_date": "string", "start_at": "string", "end_at": "string", "submission_deadline": "string", "important_milestones": [{"date": "string", "label": "string"}]}, '
-        '"submission_channel": {"method": "string", "portal_or_address": "string", "notes": "string"}, '
-        '"contacts": [{"organization": "string", "name": "string", "phone": "string", "email": "string", "topic": "string"}], '
-        '"risks_and_checks": {"compliance_risks": ["string"], "missing_information": ["string"], "go_no_go_checks": ["string"]}, '
-        '"internal_execution_plan": {"team_assignments": [{"team_member": "string", "responsibility": "string", "reason": "string"}], "immediate_next_actions": ["string"]}'
-        '}',
-        "Rules:",
-        '- Use empty strings, empty arrays, or false when the document does not provide a value.',
-        '- Extract announcement facts from the document first, then provide strategy recommendations separately.',
-        '- Do not invent eligibility or consortium rules that are not supported by the announcement.',
-        '- Preserve uncertain dates as written instead of inventing exact dates.',
-        '- If budget breakdown, forms, or presentation details are missing, record that in additional_info_needed or missing_information.',
-        '- For internal_execution_plan.team_assignments, use the provided team context when available. If team context is missing, leave team_assignments empty.',
+        schema_json,
+        "Extraction rules:",
+        *rules,
     ]
     if system_prompt.strip():
-        prompt_parts.extend(
-            [
-                "Project system prompt:",
-                system_prompt.strip(),
-            ]
-        )
+        prompt_parts += ["Project system prompt:", system_prompt.strip()]
     if instruction.strip():
-        prompt_parts.extend(
-            [
-                "Additional user instruction:",
-                instruction.strip(),
-            ]
-        )
+        prompt_parts += ["Additional user instruction:", instruction.strip()]
     if team_context.strip():
-        prompt_parts.extend(
-            [
-                "Team context for internal execution planning:",
-                team_context.strip(),
-            ]
-        )
-    prompt_parts.extend(
-        [
-            "Document text:",
-            source_text,
-        ]
-    )
-    return "\n".join(prompt_parts), truncated
+        prompt_parts += ["Team context for internal execution planning:", team_context.strip()]
+    prompt_parts += ["Document text:", cleaned]
+
+    return "\n".join(prompt_parts), False
+
+
+def _build_schema_and_rules_from_config(schema: dict) -> tuple[str, list[str]]:
+    """Build JSON schema string and rules list from extraction_schema.json."""
+    if not schema or "sections" not in schema:
+        return _FALLBACK_SCHEMA_JSON, _FALLBACK_RULES
+
+    rules = list(schema.get("extraction_rules", _FALLBACK_RULES))
+    return _STATIC_SCHEMA_JSON, rules
+
+
+# 스키마 JSON은 파싱 정확도를 위해 고정 포맷 유지 (config는 필드 설명/규칙만 관리)
+_STATIC_SCHEMA_JSON = (
+    '{'
+    '"announcement_overview": {"title": "string", "main_purpose": "string", "project_type": "string", "support_summary": "string", "ministry": "string", "professional_agency": "string", "dedicated_agency": "string", "ordering_agency": "string", "client": "string"}, '
+    '"consortium_requirements": {"consortium_required": "boolean", "demand_company_required": "boolean", "lead_org_allowed": ["string"], "partner_org_allowed": ["string"], "subcontractor_allowed": "boolean", "notes": ["string"]}, '
+    '"eligibility_by_role": [{"role": "string", "eligible_entities": ["string"], "restrictions": ["string"]}], '
+    '"recommended_consortium_strategy": {"recommended_structure": ["string"], "recommended_role_rr": [{"role": "string", "recommended_entity_type": "string", "responsibilities": ["string"]}], "key_differentiators": ["string"]}, '
+    '"budget": {"total_amount": "string", "by_year": [{"year": "string", "amount": "string"}], "matching_requirement": "string", "additional_info_needed": ["string"]}, '
+    '"submission_documents": [{"document_name": "string", "required_for": ["string"], "provided_form": "boolean", "issuance_source": "string", "notes": "string"}], '
+    '"presentation": {"required": "boolean", "notes": "string"}, '
+    '"application_schedule": {"announcement_date": "string", "start_at": "string", "end_at": "string", "submission_deadline": "string", "important_milestones": [{"date": "string", "label": "string"}]}, '
+    '"submission_channel": {"method": "string", "portal_or_address": "string", "notes": "string"}, '
+    '"contacts": [{"organization": "string", "name": "string", "phone": "string", "email": "string", "topic": "string"}], '
+    '"risks_and_checks": {"compliance_risks": ["string"], "missing_information": ["string"], "go_no_go_checks": ["string"]}, '
+    '"internal_execution_plan": {"team_assignments": [{"team_member": "string", "responsibility": "string", "reason": "string"}], "immediate_next_actions": ["string"]}'
+    '}'
+)
+
+_FALLBACK_SCHEMA_JSON = _STATIC_SCHEMA_JSON
+
+_FALLBACK_RULES = [
+    "공고 원문에 있는 사실만 추출하고, 없는 정보는 빈 문자열 또는 빈 배열로 남길 것.",
+    "submission_documents: 제출서류 목록 테이블의 모든 행을 누락 없이 추출할 것.",
+    "submission_deadline: 문서 어딘가에 마감일이 있으면 반드시 YYYY-MM-DD HH:MM 형식으로 추출할 것.",
+    "required_for 값은 반드시 '주관', '공동', '위탁', '수요' 중에서만 사용할 것.",
+    "professional_agency: 전문기관/전담기관 전체 한글 명칭을 원문 그대로 입력할 것.",
+    "팀 컨텍스트가 없으면 team_assignments는 빈 배열로 둘 것.",
+]
 
 
 def parse_document_analysis_response(response_text: str) -> dict[str, object]:
@@ -283,6 +265,11 @@ def _normalize_overview(value: object) -> dict[str, object]:
         "main_purpose": _string_value(payload, "main_purpose"),
         "project_type": _string_value(payload, "project_type"),
         "support_summary": _string_value(payload, "support_summary"),
+        "ministry": _string_value(payload, "ministry"),
+        "professional_agency": _string_value(payload, "professional_agency"),
+        "dedicated_agency": _string_value(payload, "dedicated_agency"),
+        "ordering_agency": _string_value(payload, "ordering_agency"),
+        "client": _string_value(payload, "client"),
     }
 
 
