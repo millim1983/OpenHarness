@@ -1,6 +1,6 @@
 # Latest Handoff
 
-Updated: 2026-04-13 02:55 KST
+Updated: 2026-04-13 03:05 KST
 
 ## GitHub
 
@@ -74,3 +74,8 @@ To open the web UI on the company network:
 Security note:
 
 - Do not expose this MVP directly to the public internet without an auth layer or VPN/reverse proxy access control.
+
+## Latest UI Note
+
+- Web UI user-facing copy has been localized to Korean across chat, document processing, proposal operations, and announcement-agent screens.
+- Technical acronyms such as RAG, DB, PDF, HWP, and R&D remain as standard labels.

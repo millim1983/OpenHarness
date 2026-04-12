@@ -49,12 +49,12 @@ const saveAnnouncementFeedbackButton = document.querySelector("#saveAnnouncement
 let lastAnnouncementAgentPayload = null;
 
 async function loadProfiles() {
-  setStatus("Loading profiles...");
+  setStatus("프로필을 불러오는 중...");
   const response = await fetch("/api/profiles");
   const payload = await response.json();
 
   if (!response.ok) {
-    throw new Error(payload.error || "Failed to load profiles.");
+    throw new Error(payload.error || "프로필을 불러오지 못했습니다.");
   }
 
   profileSelect.innerHTML = "";
@@ -68,7 +68,7 @@ async function loadProfiles() {
     profileSelect.appendChild(option);
   }
 
-  setStatus(`Loaded ${payload.profiles.length} profiles.`);
+  setStatus(`프로필 ${payload.profiles.length}개를 불러왔습니다.`);
 }
 
 function setStatus(message) {
@@ -101,26 +101,26 @@ function switchView(viewName) {
 
 function formatRagSources(rag) {
   if (!rag || !Array.isArray(rag.sources) || rag.sources.length === 0) {
-    return "No retrieval sources yet.";
+    return "아직 검색 출처가 없습니다.";
   }
   const filterSummary = formatAppliedRagFilters(rag.applied_filters);
   const lines = rag.sources
     .map((source) => {
-      const score = typeof source.score === "number" ? source.score.toFixed(4) : "n/a";
+      const score = typeof source.score === "number" ? source.score.toFixed(4) : "해당 없음";
       const metadata = [
-        source.document_type ? `type=${source.document_type}` : "",
-        source.title ? `title=${source.title}` : "",
-        source.ministry ? `ministry=${source.ministry}` : "",
-        source.agency ? `agency=${source.agency}` : "",
-        source.rd_or_non_rd ? `rd=${source.rd_or_non_rd}` : "",
-        source.business_type ? `business=${source.business_type}` : "",
+        source.document_type ? `유형=${formatDocumentType(source.document_type)}` : "",
+        source.title ? `제목=${source.title}` : "",
+        source.ministry ? `부처=${source.ministry}` : "",
+        source.agency ? `기관=${source.agency}` : "",
+        source.rd_or_non_rd ? `R&D=${formatRdType(source.rd_or_non_rd)}` : "",
+        source.business_type ? `사업=${source.business_type}` : "",
       ]
         .filter(Boolean)
         .join(" | ");
-      return `${source.file_name} #${source.chunk_index} score ${score}${metadata ? ` | ${metadata}` : ""}`;
+      return `${source.file_name} #${source.chunk_index} 점수 ${score}${metadata ? ` | ${metadata}` : ""}`;
     });
   if (filterSummary) {
-    lines.push(`Filters: ${filterSummary}`);
+    lines.push(`필터: ${filterSummary}`);
   }
   return lines.join("\n");
 }
@@ -137,14 +137,14 @@ function formatAppliedRagFilters(filters) {
 
 function renderRagDocuments(payload) {
   const documents = Array.isArray(payload.documents) ? payload.documents : [];
-  ragStats.textContent = `${payload.indexed_document_count || 0} documents, ${payload.indexed_chunk_count || 0} chunks`;
-  ragDbPath.textContent = payload.db_path ? `DB: ${payload.db_path}` : "DB path unavailable.";
+  ragStats.textContent = `문서 ${payload.indexed_document_count || 0}개, 청크 ${payload.indexed_chunk_count || 0}개`;
+  ragDbPath.textContent = payload.db_path ? `DB: ${payload.db_path}` : "DB 경로를 확인할 수 없습니다.";
   ragDocumentList.innerHTML = "";
 
   if (documents.length === 0) {
     const empty = document.createElement("p");
     empty.className = "helper-text";
-    empty.textContent = "No indexed RAG documents yet.";
+    empty.textContent = "아직 색인된 RAG 문서가 없습니다.";
     ragDocumentList.appendChild(empty);
     return;
   }
@@ -155,28 +155,28 @@ function renderRagDocuments(payload) {
     item.dataset.documentId = String(documentItem.id);
     item.tabIndex = 0;
     item.setAttribute("role", "button");
-    item.setAttribute("aria-label", `Open ${documentItem.file_name || `document ${documentItem.id}`}`);
+    item.setAttribute("aria-label", `${documentItem.file_name || `문서 ${documentItem.id}`} 열기`);
 
     const details = document.createElement("div");
     const title = document.createElement("h3");
-    title.textContent = documentItem.title || documentItem.file_name || `Document ${documentItem.id}`;
+    title.textContent = documentItem.title || documentItem.file_name || `문서 ${documentItem.id}`;
     const summary = document.createElement("p");
     summary.textContent = [
-      documentItem.document_type ? `type ${documentItem.document_type}` : "type unknown",
-      documentItem.ministry ? `ministry ${documentItem.ministry}` : "",
-      documentItem.agency ? `agency ${documentItem.agency}` : "",
-      documentItem.business_type ? `business ${documentItem.business_type}` : "",
-      documentItem.submission_deadline ? `deadline ${documentItem.submission_deadline}` : "",
+      documentItem.document_type ? `유형 ${formatDocumentType(documentItem.document_type)}` : "유형 미분류",
+      documentItem.ministry ? `부처 ${documentItem.ministry}` : "",
+      documentItem.agency ? `기관 ${documentItem.agency}` : "",
+      documentItem.business_type ? `사업 ${documentItem.business_type}` : "",
+      documentItem.submission_deadline ? `마감 ${documentItem.submission_deadline}` : "",
     ]
       .filter(Boolean)
       .join(" | ");
     const meta = document.createElement("p");
     meta.textContent = [
-      `ID ${documentItem.id}`,
-      documentItem.file_name ? `file ${documentItem.file_name}` : "",
-      `${documentItem.chunk_count || 0} chunks`,
-      documentItem.embedding_profile ? `embedding ${documentItem.embedding_profile}` : "embedding unknown",
-      documentItem.chat_profile ? `chat ${documentItem.chat_profile}` : "chat unknown",
+      `식별자 ${documentItem.id}`,
+      documentItem.file_name ? `파일 ${documentItem.file_name}` : "",
+      `청크 ${documentItem.chunk_count || 0}개`,
+      documentItem.embedding_profile ? `임베딩 ${documentItem.embedding_profile}` : "임베딩 미확인",
+      documentItem.chat_profile ? `챗 ${documentItem.chat_profile}` : "챗 프로필 미확인",
     ]
       .filter(Boolean)
       .join(" | ");
@@ -193,19 +193,19 @@ function renderRagDocuments(payload) {
     reindexButton.type = "button";
     reindexButton.dataset.action = "reindex";
     reindexButton.dataset.documentId = String(documentItem.id);
-    reindexButton.textContent = "Reindex";
+    reindexButton.textContent = "재색인";
     const viewButton = document.createElement("button");
     viewButton.className = "ghost-button";
     viewButton.type = "button";
     viewButton.dataset.action = "view";
     viewButton.dataset.documentId = String(documentItem.id);
-    viewButton.textContent = "Open";
+    viewButton.textContent = "열기";
     const deleteButton = document.createElement("button");
     deleteButton.className = "ghost-button danger-button";
     deleteButton.type = "button";
     deleteButton.dataset.action = "delete";
     deleteButton.dataset.documentId = String(documentItem.id);
-    deleteButton.textContent = "Delete";
+    deleteButton.textContent = "삭제";
     actions.appendChild(viewButton);
     actions.appendChild(reindexButton);
     actions.appendChild(deleteButton);
@@ -220,7 +220,7 @@ async function loadRagDocuments() {
   const response = await fetch("/api/rag/documents");
   const payload = await response.json();
   if (!response.ok) {
-    throw new Error(payload.error || "Failed to load RAG documents.");
+    throw new Error(payload.error || "RAG 문서를 불러오지 못했습니다.");
   }
   renderRagDocuments(payload);
 }
@@ -229,19 +229,19 @@ function renderIngestionState(payload) {
   const summary = payload.summary || {};
   const reviewItems = Array.isArray(payload.review_items) ? payload.review_items : [];
   ingestionStats.textContent = [
-    `${summary.source_count || 0} sources`,
-    `${summary.plan_count || 0} plans`,
-    `${summary.job_count || 0} jobs`,
-    `${summary.review_item_count || 0} review items`,
-    `${summary.needs_review_count || 0} need review`,
-    `${summary.approved_count || 0} approved`,
+    `소스 ${summary.source_count || 0}개`,
+    `계획 ${summary.plan_count || 0}개`,
+    `작업 ${summary.job_count || 0}개`,
+    `검수 항목 ${summary.review_item_count || 0}개`,
+    `검수 필요 ${summary.needs_review_count || 0}개`,
+    `승인 ${summary.approved_count || 0}개`,
   ].join(" | ");
   ingestionReviewList.innerHTML = "";
 
   if (reviewItems.length === 0) {
     const empty = document.createElement("p");
     empty.className = "helper-text";
-    empty.textContent = "No ingestion review items yet.";
+    empty.textContent = "아직 수집 검수 항목이 없습니다.";
     ingestionReviewList.appendChild(empty);
     return;
   }
@@ -251,18 +251,18 @@ function renderIngestionState(payload) {
     row.className = "ingestion-review-item";
     const details = document.createElement("div");
     const title = document.createElement("h3");
-    title.textContent = item.file_name || item.source_uri || `Review item ${item.id}`;
+    title.textContent = item.file_name || item.source_uri || `검수 항목 ${item.id}`;
     const meta = document.createElement("p");
     meta.textContent = [
-      `status ${item.review_status}`,
-      item.document_id ? `document ${item.document_id}` : "",
-      item.quality_score !== null && item.quality_score !== undefined ? `quality ${item.quality_score}` : "",
-      item.source_uri ? `source ${item.source_uri}` : "",
+      `상태 ${formatReviewStatus(item.review_status)}`,
+      item.document_id ? `문서 ${item.document_id}` : "",
+      item.quality_score !== null && item.quality_score !== undefined ? `품질 ${item.quality_score}` : "",
+      item.source_uri ? `출처 ${item.source_uri}` : "",
     ]
       .filter(Boolean)
       .join(" | ");
     const notes = document.createElement("p");
-    notes.textContent = item.notes || "No review notes.";
+    notes.textContent = item.notes || "검수 메모가 없습니다.";
     details.appendChild(title);
     details.appendChild(meta);
     details.appendChild(notes);
@@ -278,8 +278,7 @@ function renderIngestionState(payload) {
       button.type = "button";
       button.dataset.reviewItemId = String(item.id);
       button.dataset.reviewStatus = status;
-      button.textContent =
-        status === "needs_review" ? "Needs Review" : status.charAt(0).toUpperCase() + status.slice(1);
+      button.textContent = formatReviewStatus(status);
       actions.appendChild(button);
     }
 
@@ -293,14 +292,14 @@ async function loadIngestionState() {
   const response = await fetch("/api/ingestion/state");
   const payload = await response.json();
   if (!response.ok) {
-    throw new Error(payload.error || "Failed to load ingestion state.");
+    throw new Error(payload.error || "수집 상태를 불러오지 못했습니다.");
   }
   renderIngestionState(payload);
 }
 
 async function updateIngestionReviewStatus(reviewItemId, reviewStatus) {
   setBusyState(true);
-  setStatus(`Updating review item ${reviewItemId}...`);
+  setStatus(`검수 항목 ${reviewItemId} 업데이트 중...`);
   try {
     const response = await fetch("/api/ingestion/review", {
       method: "POST",
@@ -308,15 +307,15 @@ async function updateIngestionReviewStatus(reviewItemId, reviewStatus) {
       body: JSON.stringify({
         review_item_id: Number(reviewItemId),
         review_status: reviewStatus,
-        notes: reviewStatus === "approved" ? "Approved from document dashboard." : "",
+        notes: reviewStatus === "approved" ? "문서 대시보드에서 승인됨." : "",
       }),
     });
     const payload = await response.json();
     if (!response.ok) {
-      throw new Error(payload.error || "Failed to update ingestion review item.");
+      throw new Error(payload.error || "수집 검수 항목을 업데이트하지 못했습니다.");
     }
     renderIngestionState(payload);
-    setStatus(`Review item ${reviewItemId} marked ${reviewStatus}.`);
+    setStatus(`검수 항목 ${reviewItemId} 상태: ${formatReviewStatus(reviewStatus)}.`);
   } catch (error) {
     setStatus(String(error.message || error));
   } finally {
@@ -328,7 +327,7 @@ async function loadProjectContext() {
   const response = await fetch("/api/project-context");
   const payload = await response.json();
   if (!response.ok) {
-    throw new Error(payload.error || "Failed to load project context.");
+    throw new Error(payload.error || "프로젝트 문맥을 불러오지 못했습니다.");
   }
   systemPromptInput.value = payload.system_prompt || "";
   documentInstructionInput.value = payload.instruction || "";
@@ -337,7 +336,7 @@ async function loadProjectContext() {
 
 async function saveProjectContext() {
   setBusyState(true);
-  setStatus("Saving project context...");
+  setStatus("프로젝트 문맥 저장 중...");
   try {
     const response = await fetch("/api/project-context", {
       method: "POST",
@@ -350,12 +349,12 @@ async function saveProjectContext() {
     });
     const payload = await response.json();
     if (!response.ok) {
-      throw new Error(payload.error || "Failed to save project context.");
+      throw new Error(payload.error || "프로젝트 문맥을 저장하지 못했습니다.");
     }
     systemPromptInput.value = payload.system_prompt || "";
     documentInstructionInput.value = payload.instruction || "";
     teamContextInput.value = payload.team_context || "";
-    setStatus("Project context saved.");
+    setStatus("프로젝트 문맥을 저장했습니다.");
   } catch (error) {
     setStatus(String(error.message || error));
   } finally {
@@ -364,15 +363,15 @@ async function saveProjectContext() {
 }
 
 async function openRagDocument(documentId) {
-  setStatus(`Opening RAG document ${documentId}...`);
+  setStatus(`RAG 문서 ${documentId} 여는 중...`);
   try {
     const response = await fetch(`/api/rag/document?document_id=${encodeURIComponent(documentId)}`);
     const payload = await response.json();
     if (!response.ok) {
-      throw new Error(payload.error || "Failed to open RAG document.");
+      throw new Error(payload.error || "RAG 문서를 열지 못했습니다.");
     }
     renderDocumentDetail(payload);
-    setStatus(`Opened ${payload.file_name}.`);
+    setStatus(`${payload.file_name} 문서를 열었습니다.`);
   } catch (error) {
     setStatus(String(error.message || error));
   }
@@ -384,27 +383,27 @@ function renderDocumentDetail(payload) {
   const chunkFallback = Array.isArray(payload.chunks)
     ? payload.chunks.map((chunk) => `#${chunk.chunk_index}\n${chunk.text}`).join("\n\n")
     : "";
-  const extractedText = payload.extracted_text || chunkFallback || "(no stored text)";
+  const extractedText = payload.extracted_text || chunkFallback || "(저장된 텍스트 없음)";
   documentMeta.textContent = [
-    payload.file_name || `Document ${payload.id}`,
-    metadata.document_type ? `type ${metadata.document_type}` : "",
-    metadata.ministry ? `ministry ${metadata.ministry}` : "",
-    metadata.agency ? `agency ${metadata.agency}` : "",
-    metadata.submission_deadline ? `deadline ${metadata.submission_deadline}` : "",
-    payload.artifact_available ? "stored analysis available" : "showing stored chunks only",
+    payload.file_name || `문서 ${payload.id}`,
+    metadata.document_type ? `유형 ${formatDocumentType(metadata.document_type)}` : "",
+    metadata.ministry ? `부처 ${metadata.ministry}` : "",
+    metadata.agency ? `기관 ${metadata.agency}` : "",
+    metadata.submission_deadline ? `마감 ${metadata.submission_deadline}` : "",
+    payload.artifact_available ? "저장된 분석 결과 있음" : "저장된 청크만 표시 중",
   ]
     .filter(Boolean)
     .join(" | ");
   documentExtractOutput.textContent = extractedText;
-  documentSummaryOutput.textContent = payload.summary || "(no stored summary)";
+  documentSummaryOutput.textContent = payload.summary || "(저장된 요약 없음)";
   documentStructuredOutput.textContent =
     structured && Object.keys(structured).length > 0
       ? formatStructuredInsights(structured)
-      : "(no stored structured insights)";
+      : "(저장된 구조화 분석 결과 없음)";
   documentExecutionOutput.textContent =
     structured && Object.keys(structured).length > 0
       ? formatExecutionPlan(structured)
-      : "(no stored internal execution plan)";
+      : "(저장된 내부 실행계획 없음)";
 }
 
 async function runRagDocumentAction(action, documentId) {
@@ -412,7 +411,7 @@ async function runRagDocumentAction(action, documentId) {
     await openRagDocument(documentId);
     return;
   }
-  if (action === "delete" && !window.confirm(`Delete RAG document ${documentId}?`)) {
+  if (action === "delete" && !window.confirm(`RAG 문서 ${documentId}을 삭제할까요?`)) {
     return;
   }
   const endpoint = action === "delete" ? "/api/rag/delete" : "/api/rag/reindex";
@@ -422,7 +421,7 @@ async function runRagDocumentAction(action, documentId) {
   }
 
   setBusyState(true);
-  setStatus(`${action === "delete" ? "Deleting" : "Reindexing"} RAG document ${documentId}...`);
+  setStatus(`RAG 문서 ${documentId} ${action === "delete" ? "삭제" : "재색인"} 중...`);
   try {
     const response = await fetch(endpoint, {
       method: "POST",
@@ -431,10 +430,10 @@ async function runRagDocumentAction(action, documentId) {
     });
     const payload = await response.json();
     if (!response.ok) {
-      throw new Error(payload.error || "RAG document action failed.");
+      throw new Error(payload.error || "RAG 문서 작업에 실패했습니다.");
     }
     renderRagDocuments(payload);
-    setStatus(`RAG document ${documentId} ${action === "delete" ? "deleted" : "reindexed"}.`);
+    setStatus(`RAG 문서 ${documentId} ${action === "delete" ? "삭제 완료" : "재색인 완료"}.`);
   } catch (error) {
     setStatus(String(error.message || error));
   } finally {
@@ -444,64 +443,64 @@ async function runRagDocumentAction(action, documentId) {
 
 function formatRagStatus(rag) {
   if (!rag || typeof rag !== "object") {
-    return "RAG status unavailable.";
+    return "RAG 상태를 확인할 수 없습니다.";
   }
   if (rag.enabled) {
     const sourceCount = Array.isArray(rag.sources) ? rag.sources.length : 0;
     if (sourceCount > 0) {
-      return `RAG used ${sourceCount} retrieved chunks via ${rag.embedding_profile}.`;
+      return `RAG가 ${rag.embedding_profile}로 검색한 청크 ${sourceCount}개를 사용했습니다.`;
     }
-    return `RAG indexed ${rag.indexed_chunk_count || 0} chunks via ${rag.embedding_profile}.`;
+    return `RAG가 ${rag.embedding_profile}로 청크 ${rag.indexed_chunk_count || 0}개를 색인했습니다.`;
   }
   if (rag.error) {
-    return `RAG not used: ${rag.error}`;
+    return `RAG 미사용: ${rag.error}`;
   }
-  return rag.reason || "RAG not used yet.";
+  return rag.reason || "아직 RAG를 사용하지 않았습니다.";
 }
 
 function formatProposalOpsPlan(plan) {
   if (!plan || typeof plan !== "object") {
-    return "No proposal operations plan yet.";
+    return "아직 제안 운영 계획이 없습니다.";
   }
   const summary = plan.project_summary || {};
   const lines = [];
-  lines.push("Project summary");
-  lines.push(`- Title: ${summary.title || "Unknown"}`);
-  lines.push(`- Source file: ${summary.source_file || "Unknown"}`);
-  lines.push(`- Project type: ${summary.project_type || "Unknown"}`);
-  lines.push(`- Business type: ${summary.business_type || "Unknown"}`);
-  lines.push(`- Submission deadline: ${summary.submission_deadline || "Needs review"}`);
-  lines.push(`- Submission channel: ${summary.submission_channel || "Needs review"}`);
+  lines.push("사업 요약");
+  lines.push(`- 제목: ${summary.title || "미확인"}`);
+  lines.push(`- 원본 파일: ${summary.source_file || "미확인"}`);
+  lines.push(`- 프로젝트 유형: ${summary.project_type || "미확인"}`);
+  lines.push(`- 사업 유형: ${summary.business_type || "미확인"}`);
+  lines.push(`- 제출 마감: ${summary.submission_deadline || "검토 필요"}`);
+  lines.push(`- 제출 채널: ${summary.submission_channel || "검토 필요"}`);
 
-  appendObjectList(lines, "Submission checklist", plan.submission_checklist, (item) =>
-    `- [${item.status || "needs_review"}] ${item.item || "Unnamed item"} | owner: ${item.owner || "Unassigned"}${item.basis ? ` | basis: ${item.basis}` : ""}`
+  appendObjectList(lines, "제출 체크리스트", plan.submission_checklist, (item) =>
+    `- [${formatReviewStatus(item.status || "needs_review")}] ${item.item || "이름 없는 항목"} | 담당: ${item.owner || "미배정"}${item.basis ? ` | 근거: ${item.basis}` : ""}`
   );
-  appendObjectList(lines, "Manager questions", plan.manager_questions, (item) =>
-    `- ${item.question || "Unspecified question"} | target: ${item.target || "Unassigned"} | reason: ${item.reason || "review"}`
+  appendObjectList(lines, "관리자 확인 질문", plan.manager_questions, (item) =>
+    `- ${item.question || "미정 질문"} | 대상: ${item.target || "미배정"} | 사유: ${item.reason || "검토"}`
   );
-  appendObjectList(lines, "Role tasks", plan.role_tasks, (item) => {
-    const tasks = Array.isArray(item.tasks) ? item.tasks.join("; ") : "No tasks listed";
-    return `- ${item.role || "Role"} / ${item.owner || "Unassigned"}: ${tasks}${item.manager_plus_one ? ` | +1: ${item.manager_plus_one}` : ""}`;
+  appendObjectList(lines, "역할별 업무", plan.role_tasks, (item) => {
+    const tasks = Array.isArray(item.tasks) ? item.tasks.join("; ") : "등록된 업무 없음";
+    return `- ${item.role || "역할"} / ${item.owner || "미배정"}: ${tasks}${item.manager_plus_one ? ` | +1: ${item.manager_plus_one}` : ""}`;
   });
-  appendObjectList(lines, "Reminder plan", plan.reminder_plan, (item) =>
-    `- ${item.phase || "phase"}: ${item.cadence || "cadence"} | ${item.target || "target"} | ${item.condition || "condition"}`
+  appendObjectList(lines, "리마인드 계획", plan.reminder_plan, (item) =>
+    `- ${item.phase || "단계"}: ${item.cadence || "주기"} | ${item.target || "대상"} | ${item.condition || "조건"}`
   );
-  appendTextList(lines, "Folder plan", plan.folder_plan);
-  appendTextList(lines, "File output plan", plan.file_plan);
-  appendTextList(lines, "Execution preview", plan.execution_preview);
-  appendTextList(lines, "Manual inputs still needed", plan.needs_manual_inputs);
+  appendTextList(lines, "폴더 계획", plan.folder_plan);
+  appendTextList(lines, "파일 산출물 계획", plan.file_plan);
+  appendTextList(lines, "실행 미리보기", plan.execution_preview);
+  appendTextList(lines, "추가 입력 필요사항", plan.needs_manual_inputs);
   return lines.join("\n").trim();
 }
 
 function formatAnnouncementAgentMeta(agent) {
   if (!agent || typeof agent !== "object" || !agent.enabled) {
-    return "No generated files yet.";
+    return "아직 생성된 파일이 없습니다.";
   }
   return [
-    `Project folder: ${agent.project_dir || "unknown"}`,
-    `Saved source files: ${Array.isArray(agent.saved_source_files) ? agent.saved_source_files.length : 0}`,
-    `총괄장: ${agent.summary_workbook || "not generated"}`,
-    `공고 모니터링: ${agent.monitoring_workbook || "not generated"}`,
+    `생성 폴더: ${agent.project_dir || "미확인"}`,
+    `저장된 원본 파일: ${Array.isArray(agent.saved_source_files) ? agent.saved_source_files.length : 0}`,
+    `총괄장: ${agent.summary_workbook || "미생성"}`,
+    `공고 모니터링: ${agent.monitoring_workbook || "미생성"}`,
   ].join("\n");
 }
 
@@ -571,6 +570,36 @@ function appendCountGroup(lines, title, counts) {
   }
 }
 
+function formatReviewStatus(status) {
+  const labels = {
+    approved: "승인",
+    rejected: "반려",
+    needs_review: "검수 필요",
+    failed: "실패",
+    stale: "오래됨",
+  };
+  return labels[status] || status || "미확인";
+}
+
+function formatDocumentType(documentType) {
+  const labels = {
+    announcement: "공고",
+    regulation: "규정",
+    technical: "기술자료",
+    company_team: "회사/팀 자료",
+    unknown: "미분류",
+  };
+  return labels[documentType] || documentType || "미분류";
+}
+
+function formatRdType(rdType) {
+  const labels = {
+    rd: "R&D",
+    non_rd: "비R&D",
+  };
+  return labels[rdType] || rdType || "미확인";
+}
+
 function appendObjectList(lines, title, items, formatter) {
   if (!Array.isArray(items) || items.length === 0) {
     return;
@@ -611,14 +640,14 @@ async function sendMessage() {
   const systemPrompt = systemPromptInput.value.trim();
 
   if (!message) {
-    setStatus("Type a message first.");
+    setStatus("먼저 메시지를 입력하세요.");
     messageInput.focus();
     return;
   }
 
   setBusyState(true);
-  responseOutput.textContent = "Waiting for response...";
-  setStatus(`Sending with ${profile}...`);
+  responseOutput.textContent = "답변을 기다리는 중...";
+  setStatus(`${profile} 프로필로 전송 중...`);
 
   try {
     const response = await fetch("/api/chat", {
@@ -636,15 +665,15 @@ async function sendMessage() {
 
     const payload = await response.json();
     if (!response.ok) {
-      throw new Error(payload.error || "Request failed.");
+      throw new Error(payload.error || "요청에 실패했습니다.");
     }
 
-    responseOutput.textContent = payload.answer || "(empty response)";
+    responseOutput.textContent = payload.answer || "(빈 답변)";
     ragSourceOutput.textContent = formatRagSources(payload.rag);
-    setStatus(`Done with ${payload.profile}. ${formatRagStatus(payload.rag)}`);
+    setStatus(`${payload.profile} 응답 완료. ${formatRagStatus(payload.rag)}`);
   } catch (error) {
     responseOutput.textContent = String(error.message || error);
-    setStatus("Request failed.");
+    setStatus("요청에 실패했습니다.");
   } finally {
     setBusyState(false);
   }
@@ -652,7 +681,7 @@ async function sendMessage() {
 
 async function copyText(text, emptyFallbackMessage, successMessage) {
   if (!text || text === emptyFallbackMessage) {
-    setStatus("Nothing to copy yet.");
+    setStatus("아직 복사할 내용이 없습니다.");
     return;
   }
   await navigator.clipboard.writeText(text);
@@ -660,7 +689,7 @@ async function copyText(text, emptyFallbackMessage, successMessage) {
 }
 
 async function copyAnswer() {
-  await copyText(responseOutput.textContent, "No response yet.", "Answer copied.");
+  await copyText(responseOutput.textContent, "아직 답변이 없습니다.", "답변을 복사했습니다.");
 }
 
 function bytesToBase64(bytes) {
@@ -675,7 +704,7 @@ function bytesToBase64(bytes) {
 
 function formatStructuredInsights(structured) {
   if (!structured || typeof structured !== "object") {
-    return "No structured insights yet.";
+    return "아직 구조화 분석 결과가 없습니다.";
   }
 
   const metadata = structured.metadata || {};
@@ -693,45 +722,45 @@ function formatStructuredInsights(structured) {
   const lines = [];
 
   if (overview.title) {
-    lines.push(`Title: ${overview.title}`);
+    lines.push(`제목: ${overview.title}`);
   }
   if (overview.main_purpose) {
-    lines.push(`Main purpose: ${overview.main_purpose}`);
+    lines.push(`사업목적: ${overview.main_purpose}`);
   }
   if (overview.project_type) {
-    lines.push(`Project type: ${overview.project_type}`);
+    lines.push(`프로젝트 유형: ${overview.project_type}`);
   }
   if (overview.support_summary) {
-    lines.push(`Support summary: ${overview.support_summary}`);
+    lines.push(`지원 내용 요약: ${overview.support_summary}`);
   }
   if (metadata.ministry || metadata.agency || metadata.rd_or_non_rd) {
     lines.push("");
-    lines.push("Source metadata:");
+    lines.push("출처 메타데이터:");
     if (metadata.ministry) {
-      lines.push(`- Ministry: ${metadata.ministry}`);
+      lines.push(`- 부처: ${metadata.ministry}`);
     }
     if (metadata.agency) {
-      lines.push(`- Agency: ${metadata.agency}`);
+      lines.push(`- 전문기관/전담기관: ${metadata.agency}`);
     }
     if (metadata.rd_or_non_rd) {
-      lines.push(`- R&D classification: ${metadata.rd_or_non_rd}`);
+      lines.push(`- R&D 구분: ${formatRdType(metadata.rd_or_non_rd)}`);
     }
   }
 
   lines.push("");
-  lines.push("Consortium requirements:");
-  lines.push(`- Consortium required: ${consortium.consortium_required ? "Yes" : "No"}`);
-  lines.push(`- Demand company required: ${consortium.demand_company_required ? "Yes" : "No"}`);
+  lines.push("컨소시엄 요건:");
+  lines.push(`- 컨소시엄 필수: ${consortium.consortium_required ? "예" : "아니오"}`);
+  lines.push(`- 수요기업 필수: ${consortium.demand_company_required ? "예" : "아니오"}`);
   if (Array.isArray(consortium.lead_org_allowed) && consortium.lead_org_allowed.length > 0) {
-    lines.push(`- Lead org allowed: ${consortium.lead_org_allowed.join(", ")}`);
+    lines.push(`- 주관기관 가능 대상: ${consortium.lead_org_allowed.join(", ")}`);
   }
   if (Array.isArray(consortium.partner_org_allowed) && consortium.partner_org_allowed.length > 0) {
-    lines.push(`- Partner org allowed: ${consortium.partner_org_allowed.join(", ")}`);
+    lines.push(`- 공동기관 가능 대상: ${consortium.partner_org_allowed.join(", ")}`);
   }
-  lines.push(`- Subcontractor allowed: ${consortium.subcontractor_allowed ? "Yes" : "No"}`);
+  lines.push(`- 위탁 가능: ${consortium.subcontractor_allowed ? "예" : "아니오"}`);
   if (Array.isArray(consortium.notes) && consortium.notes.length > 0) {
     lines.push("");
-    lines.push("Consortium notes:");
+    lines.push("컨소시엄 비고:");
     for (const note of consortium.notes) {
       lines.push(`- ${note}`);
     }
@@ -739,37 +768,37 @@ function formatStructuredInsights(structured) {
 
   if (eligibility.length > 0) {
     lines.push("");
-    lines.push("Eligibility by role:");
+    lines.push("역할별 자격:");
     for (const item of eligibility) {
       const entities = Array.isArray(item.eligible_entities) ? item.eligible_entities.join(", ") : "";
-      lines.push(`- ${item.role || "Unknown role"}: ${entities || "No eligible entities listed"}`);
+      lines.push(`- ${item.role || "미확인 역할"}: ${entities || "자격 대상 미기재"}`);
       if (Array.isArray(item.restrictions) && item.restrictions.length > 0) {
-        lines.push(`  restrictions: ${item.restrictions.join("; ")}`);
+        lines.push(`  제한사항: ${item.restrictions.join("; ")}`);
       }
     }
   }
 
   if (Array.isArray(strategy.recommended_structure) && strategy.recommended_structure.length > 0) {
     lines.push("");
-    lines.push("Recommended consortium strategy:");
+    lines.push("추천 컨소시엄 전략:");
     for (const item of strategy.recommended_structure) {
       lines.push(`- ${item}`);
     }
   }
   if (Array.isArray(strategy.recommended_role_rr) && strategy.recommended_role_rr.length > 0) {
     lines.push("");
-    lines.push("Recommended role R&R:");
+    lines.push("추천 역할/R&R:");
     for (const item of strategy.recommended_role_rr) {
-      const roleLine = `${item.role || "Unknown role"} -> ${item.recommended_entity_type || "Unspecified entity"}`;
+      const roleLine = `${item.role || "미확인 역할"} -> ${item.recommended_entity_type || "미지정 기관유형"}`;
       lines.push(`- ${roleLine}`);
       if (Array.isArray(item.responsibilities) && item.responsibilities.length > 0) {
-        lines.push(`  responsibilities: ${item.responsibilities.join("; ")}`);
+        lines.push(`  책임: ${item.responsibilities.join("; ")}`);
       }
     }
   }
   if (Array.isArray(strategy.key_differentiators) && strategy.key_differentiators.length > 0) {
     lines.push("");
-    lines.push("Key differentiators:");
+    lines.push("핵심 차별화 요소:");
     for (const item of strategy.key_differentiators) {
       lines.push(`- ${item}`);
     }
@@ -777,121 +806,121 @@ function formatStructuredInsights(structured) {
 
   if (budget.total_amount || budget.matching_requirement || (Array.isArray(budget.by_year) && budget.by_year.length > 0)) {
     lines.push("");
-    lines.push("Budget:");
+    lines.push("예산:");
     if (budget.total_amount) {
-      lines.push(`- Total amount: ${budget.total_amount}`);
+      lines.push(`- 총액: ${budget.total_amount}`);
     }
     if (Array.isArray(budget.by_year) && budget.by_year.length > 0) {
       for (const item of budget.by_year) {
-        lines.push(`- ${item.year || "Year"}: ${item.amount || "Amount not listed"}`);
+        lines.push(`- ${item.year || "연도"}: ${item.amount || "금액 미기재"}`);
       }
     }
     if (budget.matching_requirement) {
-      lines.push(`- Matching requirement: ${budget.matching_requirement}`);
+      lines.push(`- 매칭 요건: ${budget.matching_requirement}`);
     }
     if (Array.isArray(budget.additional_info_needed) && budget.additional_info_needed.length > 0) {
-      lines.push(`- Additional info needed: ${budget.additional_info_needed.join("; ")}`);
+      lines.push(`- 추가 확인 필요: ${budget.additional_info_needed.join("; ")}`);
     }
   }
 
   if (documents.length > 0) {
     lines.push("");
-    lines.push("Submission documents:");
+    lines.push("제출서류:");
     for (const item of documents) {
       const requiredFor = Array.isArray(item.required_for) ? item.required_for.join(", ") : "";
-      const providedForm = item.provided_form ? "provided" : "external/unknown";
-      lines.push(`- ${item.document_name || "Unnamed document"} | required for: ${requiredFor || "unspecified"} | form: ${providedForm}`);
+      const providedForm = item.provided_form ? "양식 제공" : "외부/미확인";
+      lines.push(`- ${item.document_name || "이름 없는 문서"} | 대상: ${requiredFor || "미지정"} | 양식: ${providedForm}`);
       if (item.issuance_source) {
-        lines.push(`  source: ${item.issuance_source}`);
+        lines.push(`  발급처: ${item.issuance_source}`);
       }
       if (item.notes) {
-        lines.push(`  notes: ${item.notes}`);
+        lines.push(`  비고: ${item.notes}`);
       }
     }
   }
 
   lines.push("");
-  lines.push(`Presentation required: ${presentation.required ? "Yes" : "No"}`);
+  lines.push(`발표평가 필요: ${presentation.required ? "예" : "아니오"}`);
   if (presentation.notes) {
-    lines.push(`Presentation notes: ${presentation.notes}`);
+    lines.push(`발표 비고: ${presentation.notes}`);
   }
 
   if (schedule.announcement_date || schedule.start_at || schedule.end_at || schedule.submission_deadline) {
     lines.push("");
-    lines.push("Application schedule:");
+    lines.push("접수 일정:");
     if (schedule.announcement_date) {
-      lines.push(`- Announcement date: ${schedule.announcement_date}`);
+      lines.push(`- 공고일: ${schedule.announcement_date}`);
     }
     if (schedule.start_at) {
-      lines.push(`- Start: ${schedule.start_at}`);
+      lines.push(`- 시작: ${schedule.start_at}`);
     }
     if (schedule.end_at) {
-      lines.push(`- End: ${schedule.end_at}`);
+      lines.push(`- 종료: ${schedule.end_at}`);
     }
     if (schedule.submission_deadline) {
-      lines.push(`- Submission deadline: ${schedule.submission_deadline}`);
+      lines.push(`- 제출 마감: ${schedule.submission_deadline}`);
     }
     if (Array.isArray(schedule.important_milestones) && schedule.important_milestones.length > 0) {
       for (const item of schedule.important_milestones) {
-        lines.push(`- ${item.date || "Unknown date"}: ${item.label || "Milestone"}`);
+        lines.push(`- ${item.date || "미확인 날짜"}: ${item.label || "주요 일정"}`);
       }
     }
   }
 
   if (channel.method || channel.portal_or_address || channel.notes) {
     lines.push("");
-    lines.push("Submission channel:");
+    lines.push("접수 채널:");
     if (channel.method) {
-      lines.push(`- Method: ${channel.method}`);
+      lines.push(`- 방법: ${channel.method}`);
     }
     if (channel.portal_or_address) {
-      lines.push(`- Portal/address: ${channel.portal_or_address}`);
+      lines.push(`- 포털/주소: ${channel.portal_or_address}`);
     }
     if (channel.notes) {
-      lines.push(`- Notes: ${channel.notes}`);
+      lines.push(`- 비고: ${channel.notes}`);
     }
   }
 
   if (contacts.length > 0) {
     lines.push("");
-    lines.push("Contacts:");
+    lines.push("문의처:");
     for (const item of contacts) {
       const details = [item.organization, item.name, item.phone, item.email].filter(Boolean).join(" | ");
-      lines.push(`- ${details || "Unknown contact"}`);
+      lines.push(`- ${details || "미확인 문의처"}`);
       if (item.topic) {
-        lines.push(`  topic: ${item.topic}`);
+        lines.push(`  주제: ${item.topic}`);
       }
     }
   }
 
   if (Array.isArray(risks.compliance_risks) && risks.compliance_risks.length > 0) {
     lines.push("");
-    lines.push("Compliance risks:");
+    lines.push("컴플라이언스 리스크:");
     for (const item of risks.compliance_risks) {
       lines.push(`- ${item}`);
     }
   }
   if (Array.isArray(risks.missing_information) && risks.missing_information.length > 0) {
     lines.push("");
-    lines.push("Missing information:");
+    lines.push("누락/확인 필요 정보:");
     for (const item of risks.missing_information) {
       lines.push(`- ${item}`);
     }
   }
   if (Array.isArray(risks.go_no_go_checks) && risks.go_no_go_checks.length > 0) {
     lines.push("");
-    lines.push("Go/No-Go checks:");
+    lines.push("제안 여부 판단 체크:");
     for (const item of risks.go_no_go_checks) {
       lines.push(`- ${item}`);
     }
   }
 
-  return lines.join("\n").trim() || "No structured insights yet.";
+  return lines.join("\n").trim() || "아직 구조화 분석 결과가 없습니다.";
 }
 
 function formatExecutionPlan(structured) {
   if (!structured || typeof structured !== "object") {
-    return "No internal execution plan yet.";
+    return "아직 내부 실행계획이 없습니다.";
   }
 
   const internalPlan = structured.internal_execution_plan || {};
@@ -900,13 +929,13 @@ function formatExecutionPlan(structured) {
   const lines = [];
 
   if (assignments.length > 0) {
-    lines.push("Team assignments:");
+    lines.push("팀 배정:");
     for (const item of assignments) {
-      const member = item.team_member || "Unassigned";
-      const responsibility = item.responsibility || "No responsibility listed";
+      const member = item.team_member || "미배정";
+      const responsibility = item.responsibility || "등록된 책임 없음";
       lines.push(`- ${member}: ${responsibility}`);
       if (item.reason) {
-        lines.push(`  reason: ${item.reason}`);
+        lines.push(`  사유: ${item.reason}`);
       }
     }
   }
@@ -915,13 +944,13 @@ function formatExecutionPlan(structured) {
     if (lines.length > 0) {
       lines.push("");
     }
-    lines.push("Immediate next actions:");
+    lines.push("즉시 진행할 업무:");
     for (const item of nextActions) {
       lines.push(`- ${item}`);
     }
   }
 
-  return lines.join("\n").trim() || "No internal execution plan yet.";
+  return lines.join("\n").trim() || "아직 내부 실행계획이 없습니다.";
 }
 
 async function processDocument() {
@@ -932,18 +961,18 @@ async function processDocument() {
   const teamContext = teamContextInput.value.trim();
 
   if (!file) {
-    setStatus("Choose a document first.");
+    setStatus("먼저 문서를 선택하세요.");
     documentInput.focus();
     return;
   }
 
   setBusyState(true);
-  documentMeta.textContent = `Processing ${file.name}...`;
-  documentExtractOutput.textContent = "Extracting text...";
-  documentSummaryOutput.textContent = "Waiting for summary...";
-  documentStructuredOutput.textContent = "Waiting for structured insights...";
-  documentExecutionOutput.textContent = "Waiting for internal execution plan...";
-  setStatus(`Uploading ${file.name} with ${profile}...`);
+  documentMeta.textContent = `${file.name} 처리 중...`;
+  documentExtractOutput.textContent = "텍스트 추출 중...";
+  documentSummaryOutput.textContent = "요약 대기 중...";
+  documentStructuredOutput.textContent = "구조화 분석 대기 중...";
+  documentExecutionOutput.textContent = "내부 실행계획 대기 중...";
+  setStatus(`${profile} 프로필로 ${file.name} 업로드 중...`);
 
   try {
     const arrayBuffer = await file.arrayBuffer();
@@ -965,31 +994,31 @@ async function processDocument() {
 
     const payload = await response.json();
     if (!response.ok) {
-      throw new Error(payload.error || "Document processing failed.");
+      throw new Error(payload.error || "문서 처리에 실패했습니다.");
     }
 
     documentMeta.textContent =
-      `${payload.file_name} processed with ${payload.profile}. ` +
-      `${payload.extracted_char_count} chars extracted. ` +
+      `${payload.file_name} 문서를 ${payload.profile} 프로필로 처리했습니다. ` +
+      `${payload.extracted_char_count}자 추출. ` +
       formatRagStatus(payload.rag) +
-      (payload.summary_source_truncated ? " Summary source truncated for MVP." : "");
-    documentExtractOutput.textContent = payload.extracted_text || "(empty extracted text)";
-    documentSummaryOutput.textContent = payload.summary || "(empty summary)";
+      (payload.summary_source_truncated ? " MVP 제한으로 요약 입력 일부가 잘렸습니다." : "");
+    documentExtractOutput.textContent = payload.extracted_text || "(빈 추출 텍스트)";
+    documentSummaryOutput.textContent = payload.summary || "(빈 요약)";
     documentStructuredOutput.textContent = formatStructuredInsights(payload.structured);
     documentExecutionOutput.textContent = formatExecutionPlan(payload.structured);
     proposalOpsOutput.textContent = formatProposalOpsPlan(payload.proposal_ops);
     announcementAgentMeta.textContent = formatAnnouncementAgentMeta(payload.announcement_agent);
     renderRagDocuments(payload.rag || {});
     await loadIngestionState();
-    setStatus(`Document processed with ${payload.profile}. ${formatRagStatus(payload.rag)}`);
+    setStatus(`${payload.profile} 프로필로 문서를 처리했습니다. ${formatRagStatus(payload.rag)}`);
   } catch (error) {
     const message = String(error.message || error);
-    documentMeta.textContent = "Document processing failed.";
+    documentMeta.textContent = "문서 처리에 실패했습니다.";
     documentExtractOutput.textContent = message;
     documentSummaryOutput.textContent = message;
     documentStructuredOutput.textContent = message;
     documentExecutionOutput.textContent = message;
-    setStatus("Document request failed.");
+    setStatus("문서 요청에 실패했습니다.");
   } finally {
     setBusyState(false);
   }
@@ -1117,15 +1146,15 @@ async function saveAnnouncementFeedback() {
 function handleDocumentSelection() {
   const file = documentInput.files?.[0];
   if (!file) {
-    documentMeta.textContent = "No document processed yet.";
+    documentMeta.textContent = "아직 처리한 문서가 없습니다.";
     return;
   }
 
-  documentMeta.textContent = `Selected file: ${file.name}`;
-  documentExtractOutput.textContent = "No extracted text yet.";
-  documentSummaryOutput.textContent = "No summary yet.";
-  documentStructuredOutput.textContent = "No structured insights yet.";
-  documentExecutionOutput.textContent = "No internal execution plan yet.";
+  documentMeta.textContent = `선택한 파일: ${file.name}`;
+  documentExtractOutput.textContent = "아직 추출 텍스트가 없습니다.";
+  documentSummaryOutput.textContent = "아직 요약이 없습니다.";
+  documentStructuredOutput.textContent = "아직 구조화 분석 결과가 없습니다.";
+  documentExecutionOutput.textContent = "아직 내부 실행계획이 없습니다.";
 }
 
 function handleAnnouncementFolderSelection() {
@@ -1148,7 +1177,7 @@ function handleAnnouncementFolderSelection() {
 refreshRagButton.addEventListener("click", async () => {
   try {
     await loadRagDocuments();
-    setStatus("RAG documents refreshed.");
+    setStatus("RAG 문서를 새로고침했습니다.");
   } catch (error) {
     setStatus(String(error.message || error));
   }
@@ -1157,7 +1186,7 @@ refreshRagButton.addEventListener("click", async () => {
 refreshIngestionButton.addEventListener("click", async () => {
   try {
     await loadIngestionState();
-    setStatus("Ingestion state refreshed.");
+    setStatus("수집 상태를 새로고침했습니다.");
   } catch (error) {
     setStatus(String(error.message || error));
   }
@@ -1242,34 +1271,34 @@ announcementFolderInput.addEventListener("change", () => {
 });
 
 copyExtractedButton.addEventListener("click", () => {
-  void copyText(documentExtractOutput.textContent, "No extracted text yet.", "Extracted text copied.");
+  void copyText(documentExtractOutput.textContent, "아직 추출 텍스트가 없습니다.", "추출 텍스트를 복사했습니다.");
 });
 
 copySummaryButton.addEventListener("click", () => {
-  void copyText(documentSummaryOutput.textContent, "No summary yet.", "Summary copied.");
+  void copyText(documentSummaryOutput.textContent, "아직 요약이 없습니다.", "요약을 복사했습니다.");
 });
 
 copyStructuredButton.addEventListener("click", () => {
   void copyText(
     documentStructuredOutput.textContent,
-    "No structured insights yet.",
-    "Structured insights copied."
+    "아직 구조화 분석 결과가 없습니다.",
+    "구조화 분석 결과를 복사했습니다."
   );
 });
 
 copyExecutionButton.addEventListener("click", () => {
   void copyText(
     documentExecutionOutput.textContent,
-    "No internal execution plan yet.",
-    "Internal execution plan copied."
+    "아직 내부 실행계획이 없습니다.",
+    "내부 실행계획을 복사했습니다."
   );
 });
 
 copyProposalOpsButton.addEventListener("click", () => {
   void copyText(
     proposalOpsOutput.textContent,
-    "No proposal operations plan yet.",
-    "Proposal operations plan copied."
+    "아직 제안 운영 계획이 없습니다.",
+    "제안 운영 계획을 복사했습니다."
   );
 });
 

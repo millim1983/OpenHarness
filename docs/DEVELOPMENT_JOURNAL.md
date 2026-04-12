@@ -37,3 +37,8 @@
 - Kept proposal folder-tree creation out of the announcement stage; `folder_tree.json` is reserved for the later proposal-drive stage after proposal decision.
 - Changed monitoring output to `공고리스트_yyyymmdd.xlsx` based on the latest update date, backed by `공고리스트.json`.
 - Added monitoring dashboard stats for upload date, ministry, business type, and business domain.
+
+### Web UI Korean Localization
+- Localized the web UI copy from English to Korean across chat, document processing, proposal operations, and announcement-agent screens.
+- Localized dynamic browser messages for RAG documents, ingestion review, document analysis, proposal operations, and copy/status feedback.
+- Kept technical acronyms such as RAG, DB, PDF, HWP, and R&D where they are standard user-facing terms.

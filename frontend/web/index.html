@@ -1,18 +1,18 @@
 <!doctype html>
-<html lang="en">
+<html lang="ko">
   <head>
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
-    <title>OpenHarness Web MVP</title>
+    <title>오픈하네스 업무 에이전트</title>
     <link rel="stylesheet" href="./styles.css">
   </head>
   <body>
     <main class="app-shell">
       <section class="hero-card">
-        <p class="eyebrow">OpenHarness Web MVP</p>
-        <h1>Simple browser chat for fast model checks</h1>
+        <p class="eyebrow">오픈하네스 업무 에이전트</p>
+        <h1>공고 분석과 업무 자동화를 위한 내부 도구</h1>
         <p class="intro">
-          Pick a configured profile, send one message, and inspect the answer without leaving the browser.
+          모델 프로필을 선택하고 문서 기반 질의, 공고 처리, 제안 운영 준비를 한 화면에서 진행합니다.
         </p>
       </section>
 
@@ -20,94 +20,94 @@
         <section class="chat-card workspace-content">
           <div class="toolbar">
             <label class="field">
-              <span>Profile</span>
+              <span>프로필</span>
               <select id="profileSelect"></select>
             </label>
-            <button id="refreshProfilesButton" class="ghost-button" type="button">Refresh Profiles</button>
+            <button id="refreshProfilesButton" class="ghost-button" type="button">프로필 새로고침</button>
           </div>
 
           <section id="chatView" class="workspace-view is-active" data-view="chat">
             <label class="field">
-              <span>Message</span>
+              <span>메시지</span>
               <textarea
                 id="messageInput"
                 rows="6"
-                placeholder="Ask against the indexed document base."
+                placeholder="색인된 문서 기반으로 질문하세요."
               ></textarea>
             </label>
             <p class="helper-text">
-              Follow-up chat uses retrieved document context when indexed chunks match the question.
+              색인된 문서 조각이 질문과 맞으면 검색된 문맥을 사용해 답변합니다.
             </p>
 
             <section class="project-context-panel">
               <div class="response-header">
-                <h2>Project Context</h2>
-                <button id="saveProjectContextButton" class="ghost-button" type="button">Save Defaults</button>
+                <h2>프로젝트 기본 문맥</h2>
+                <button id="saveProjectContextButton" class="ghost-button" type="button">기본값 저장</button>
               </div>
               <label class="field">
-                <span>System Prompt</span>
+                <span>시스템 프롬프트</span>
                 <textarea
                   id="systemPromptInput"
                   rows="4"
-                  placeholder="How this workspace should think and respond."
+                  placeholder="이 업무공간에서 모델이 어떻게 판단하고 응답해야 하는지 입력하세요."
                 ></textarea>
               </label>
               <p class="helper-text">
-                These defaults are reused for chat and document analysis.
+                이 기본값은 챗과 문서 분석에 함께 사용됩니다.
               </p>
             </section>
 
             <section class="rag-filter-panel">
-              <h2>RAG Filters</h2>
+              <h2>RAG 검색 필터</h2>
               <div class="rag-filter-grid">
                 <label class="field">
-                  <span>Document Type</span>
+                  <span>문서 유형</span>
                   <select id="ragFilterDocumentType">
-                    <option value="">Any</option>
-                    <option value="announcement">Announcement</option>
-                    <option value="regulation">Regulation</option>
-                    <option value="technical">Technical</option>
-                    <option value="company_team">Company/team</option>
-                    <option value="unknown">Unknown</option>
+                    <option value="">전체</option>
+                    <option value="announcement">공고</option>
+                    <option value="regulation">규정</option>
+                    <option value="technical">기술자료</option>
+                    <option value="company_team">회사/팀 자료</option>
+                    <option value="unknown">미분류</option>
                   </select>
                 </label>
                 <label class="field">
-                  <span>Ministry</span>
-                  <input id="ragFilterMinistry" type="text" placeholder="Any ministry">
+                  <span>부처</span>
+                  <input id="ragFilterMinistry" type="text" placeholder="전체 부처">
                 </label>
                 <label class="field">
-                  <span>Agency</span>
-                  <input id="ragFilterAgency" type="text" placeholder="Any agency">
+                  <span>전문기관/전담기관</span>
+                  <input id="ragFilterAgency" type="text" placeholder="전체 기관">
                 </label>
                 <label class="field">
-                  <span>R&amp;D Type</span>
+                  <span>R&amp;D 구분</span>
                   <select id="ragFilterRdType">
-                    <option value="">Any</option>
+                    <option value="">전체</option>
                     <option value="rd">R&amp;D</option>
-                    <option value="non_rd">Non-R&amp;D</option>
+                    <option value="non_rd">비R&amp;D</option>
                   </select>
                 </label>
                 <label class="field">
-                  <span>Business Type</span>
-                  <input id="ragFilterBusinessType" type="text" placeholder="Any business type">
+                  <span>사업 유형</span>
+                  <input id="ragFilterBusinessType" type="text" placeholder="전체 사업 유형">
                 </label>
               </div>
             </section>
 
             <div class="actions">
-              <button id="sendButton" class="primary-button" type="button">Send</button>
-              <p id="statusText" class="status-text">Ready</p>
+              <button id="sendButton" class="primary-button" type="button">전송</button>
+              <p id="statusText" class="status-text">준비됨</p>
             </div>
 
             <section class="response-panel">
               <div class="response-header">
-                <h2>Answer</h2>
-                <button id="copyButton" class="ghost-button" type="button">Copy</button>
+                <h2>답변</h2>
+                <button id="copyButton" class="ghost-button" type="button">복사</button>
               </div>
-              <pre id="responseOutput">No response yet.</pre>
+              <pre id="responseOutput">아직 답변이 없습니다.</pre>
               <div class="source-panel">
-                <h3>RAG Sources</h3>
-                <pre id="ragSourceOutput">No retrieval sources yet.</pre>
+                <h3>RAG 출처</h3>
+                <pre id="ragSourceOutput">아직 검색 출처가 없습니다.</pre>
               </div>
             </section>
           </section>
@@ -115,88 +115,88 @@
           <section id="documentView" class="workspace-view" data-view="documents">
             <section class="rag-dashboard">
               <div class="response-header">
-                <h2>Document Processing Dashboard</h2>
-                <button id="refreshRagButton" class="ghost-button" type="button">Refresh RAG</button>
+                <h2>문서 처리 대시보드</h2>
+                <button id="refreshRagButton" class="ghost-button" type="button">RAG 새로고침</button>
               </div>
-              <div class="rag-stats" id="ragStats">No RAG documents loaded yet.</div>
-              <div class="rag-db-path" id="ragDbPath">DB path unavailable.</div>
+              <div class="rag-stats" id="ragStats">아직 불러온 RAG 문서가 없습니다.</div>
+              <div class="rag-db-path" id="ragDbPath">DB 경로를 확인할 수 없습니다.</div>
               <div class="rag-document-list" id="ragDocumentList"></div>
             </section>
 
             <section class="ingestion-dashboard">
               <div class="response-header">
-                <h2>Ingestion Review</h2>
-                <button id="refreshIngestionButton" class="ghost-button" type="button">Refresh Ingestion</button>
+                <h2>수집 검수</h2>
+                <button id="refreshIngestionButton" class="ghost-button" type="button">수집 상태 새로고침</button>
               </div>
-              <div class="ingestion-stats" id="ingestionStats">No ingestion state loaded yet.</div>
+              <div class="ingestion-stats" id="ingestionStats">아직 불러온 수집 상태가 없습니다.</div>
               <div class="ingestion-review-list" id="ingestionReviewList"></div>
             </section>
 
             <section class="document-panel">
           <div class="response-header">
-            <h2>Announcement Analysis</h2>
-            <button id="processDocumentButton" class="primary-button" type="button">Upload and Analyze</button>
+            <h2>공고 분석</h2>
+            <button id="processDocumentButton" class="primary-button" type="button">업로드 후 분석</button>
           </div>
 
           <label class="field">
-            <span>Document File</span>
+            <span>문서 파일</span>
             <input id="documentInput" type="file" accept=".txt,.md,.csv,.json,.yaml,.yml,.docx,.pdf">
           </label>
           <p class="helper-text">
-            PDF extraction needs the `pypdf` package in the project venv. After pulling this change, run `uv sync` in WSL once before testing PDFs.
+            PDF 추출에는 프로젝트 가상환경의 `pypdf` 패키지가 필요합니다. 서버 배포 후 한 번 `uv sync`를 실행하세요.
           </p>
 
           <label class="field">
-            <span>Default Instruction</span>
+            <span>기본 지시문</span>
             <textarea
               id="documentInstructionInput"
               rows="3"
-              placeholder="Focus on consortium rules, required documents, and deadlines."
+              placeholder="컨소시엄 규칙, 제출서류, 마감일을 중심으로 분석하세요."
             ></textarea>
           </label>
 
           <label class="field">
-            <span>Default Team Context</span>
+            <span>기본 팀 문맥</span>
             <textarea
               id="teamContextInput"
               rows="5"
-              placeholder="Alex PM: schedule management, final submission&#10;Finance Lead: budget review, finance documents&#10;CEO: demand company outreach, consortium negotiation"
+              placeholder="사업관리 담당: 일정 관리, 최종 접수&#10;예산 담당: 예산 검토, 재무 서류&#10;대표: 수요기업 협의, 컨소시엄 협상"
             ></textarea>
           </label>
 
-          <div class="document-meta" id="documentMeta">No document processed yet.</div>
+          <div class="document-meta" id="documentMeta">아직 처리한 문서가 없습니다.</div>
 
           <div class="document-results">
             <section class="response-panel">
               <div class="response-header">
-                <h2>Extracted Text</h2>
-                <button id="copyExtractedButton" class="ghost-button" type="button">Copy</button>
+                <h2>추출 텍스트</h2>
+                <button id="copyExtractedButton" class="ghost-button" type="button">복사</button>
               </div>
-              <pre id="documentExtractOutput">No extracted text yet.</pre>
+              <pre id="documentExtractOutput">아직 추출 텍스트가 없습니다.</pre>
             </section>
 
             <section class="response-panel">
               <div class="response-header">
-                <h2>Summary</h2>
-                <button id="copySummaryButton" class="ghost-button" type="button">Copy</button>
+                <h2>요약</h2>
+                <button id="copySummaryButton" class="ghost-button" type="button">복사</button>
               </div>
-              <pre id="documentSummaryOutput">No summary yet.</pre>
+              <pre id="documentSummaryOutput">아직 요약이 없습니다.</pre>
             </section>
 
             <section class="response-panel">
               <div class="response-header">
-                <h2>Structured Insights</h2>
-                <button id="copyStructuredButton" class="ghost-button" type="button">Copy</button>
+                <h2>구조화 분석</h2>
+                <button id="copyStructuredButton" class="ghost-button" type="button">복사</button>
               </div>
-              <pre id="documentStructuredOutput">No structured insights yet.</pre>
+              <pre id="documentStructuredOutput">아직 구조화 분석 결과가 없습니다.</pre>
             </section>
 
             <section class="response-panel">
               <div class="response-header">
-                <h2>Internal Execution</h2>
-                <button id="copyExecutionButton" class="ghost-button" type="button">Copy</button>
+                <h2>내부 실행계획</h2>
+                <button id="copyExecutionButton" class="ghost-button" type="button">복사</button>
               </div>
-              <pre id="documentExecutionOutput">No internal execution plan yet.</pre>
+              <pre id="documentExecutionOutput">아직 내부 실행계획이 없습니다.</pre>
             </section>
           </div>
         </section>
@@ -205,14 +205,14 @@
           <section id="proposalOpsView" class="workspace-view" data-view="proposal-ops">
             <section class="proposal-ops-panel">
               <div class="response-header">
-                <h2>Proposal Operations</h2>
-                <button id="copyProposalOpsButton" class="ghost-button" type="button">Copy</button>
+                <h2>제안 운영</h2>
+                <button id="copyProposalOpsButton" class="ghost-button" type="button">복사</button>
               </div>
               <p class="helper-text">
-                Upload and analyze a notice in Document Pipeline, then review the operations plan here before any execution.
+                문서 처리에서 공고를 업로드하고 분석한 뒤, 실행 전 운영 계획을 여기서 검토합니다.
               </p>
-              <div class="proposal-agent-meta" id="announcementAgentMeta">No generated files yet.</div>
-              <pre id="proposalOpsOutput">No proposal operations plan yet.</pre>
+              <div class="proposal-agent-meta" id="announcementAgentMeta">아직 생성된 파일이 없습니다.</div>
+              <pre id="proposalOpsOutput">아직 제안 운영 계획이 없습니다.</pre>
             </section>
           </section>
 
@@ -253,7 +253,7 @@
                 <section class="response-panel">
                   <div class="response-header">
                     <h2>실행 결과</h2>
-                    <button id="copyAnnouncementAgentButton" class="ghost-button" type="button">Copy</button>
+                    <button id="copyAnnouncementAgentButton" class="ghost-button" type="button">복사</button>
                   </div>
                   <pre id="announcementAgentOutput">아직 실행 결과가 없습니다.</pre>
                 </section>
@@ -267,10 +267,10 @@
           </section>
         </section>
 
-        <aside class="nav-panel" aria-label="Workspace navigation">
-          <button class="nav-button is-active" type="button" data-target-view="chat">Chat</button>
-          <button class="nav-button" type="button" data-target-view="documents">Document Pipeline</button>
-          <button class="nav-button" type="button" data-target-view="proposal-ops">Proposal Ops</button>
+        <aside class="nav-panel" aria-label="업무공간 내비게이션">
+          <button class="nav-button is-active" type="button" data-target-view="chat">챗</button>
+          <button class="nav-button" type="button" data-target-view="documents">문서 처리</button>
+          <button class="nav-button" type="button" data-target-view="proposal-ops">제안 운영</button>
           <button class="nav-button" type="button" data-target-view="announcement-agent">공고 에이전트</button>
         </aside>
       </div>
