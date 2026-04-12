@@ -27,9 +27,11 @@ from openharness.services.rag_store import RagStore
 from openharness.services.rag_types import ChunkRecord, RagRetrievalFilters
 from openharness.services.web_runtime import run_single_prompt_sync
 from openharness.services.workflows import (
+    AnnouncementAgentRequest,
     DocumentWorkflowRequest,
     ProposalOpsRequest,
     build_proposal_ops_preview,
+    run_announcement_agent,
     run_announcement_analysis,
 )
 
@@ -348,6 +350,15 @@ def _run_document_summary(
             team_context=team_context,
         )
     )
+    announcement_agent = run_announcement_agent(
+        AnnouncementAgentRequest(
+            file_name=filename,
+            file_bytes=file_bytes,
+            structured_analysis=workflow_result.structured,
+            instruction=instruction,
+            team_context=team_context,
+        )
+    )
     return {
         "profile": profile_name,
         "file_name": filename,
@@ -357,6 +368,7 @@ def _run_document_summary(
         "summary": workflow_result.summary,
         "structured": workflow_result.structured,
         "proposal_ops": proposal_ops,
+        "announcement_agent": announcement_agent,
         "summary_source_truncated": workflow_result.prompt_source_truncated,
         "rag": rag_status,
     }

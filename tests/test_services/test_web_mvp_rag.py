@@ -210,6 +210,7 @@ def test_run_document_summary_stores_detail_artifact(tmp_path: Path, monkeypatch
         lambda *args, **kwargs: FakeEmbeddingBackend(),
     )
     monkeypatch.setattr(module.RagStore, "for_project", classmethod(lambda cls, cwd: store))
+    monkeypatch.setenv("OPENHARNESS_PROPOSAL_OUTPUT_DIR", str(tmp_path / "proposal_outputs"))
     monkeypatch.setattr(
         module,
         "run_announcement_analysis",
@@ -241,6 +242,8 @@ def test_run_document_summary_stores_detail_artifact(tmp_path: Path, monkeypatch
     ]
     assert result["proposal_ops"]["project_summary"]["title"] == "Stored notice"
     assert "folder_plan" in result["proposal_ops"]
+    assert result["announcement_agent"]["enabled"] is True
+    assert result["announcement_agent"]["summary_workbook"].endswith("총괄장.xlsx")
 
 
 def test_ingestion_state_and_review_update_helpers(tmp_path: Path, monkeypatch) -> None:

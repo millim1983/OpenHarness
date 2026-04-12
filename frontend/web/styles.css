@@ -291,6 +291,19 @@ textarea {
   box-shadow: var(--shadow);
 }
 
+.proposal-agent-meta {
+  margin: 12px 0;
+  padding: 12px;
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  background: var(--surface-subtle);
+  color: var(--muted);
+  font-size: 0.9rem;
+  line-height: 1.5;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+
 .rag-stats,
 .rag-db-path,
 .ingestion-stats {

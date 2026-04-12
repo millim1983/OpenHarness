@@ -50,6 +50,36 @@ Current navigation:
 - Document Pipeline
 - Proposal Ops
 
+## Announcement Agent First Automation Target
+
+The announcement agent handles discovered/uploaded notices regardless of final go/no-go decision.
+
+Initial behavior:
+
+1. Process the uploaded notice through the document/RAG path.
+2. Extract structured announcement information from the notice.
+3. Create a project folder under the configured proposal output root.
+4. Use folder naming rule: `제출마감일-전문기관약자-사업명`.
+5. Save the uploaded source file under `00_공고_원문`.
+6. Create `총괄장.xlsx` with tabs:
+   - `사업개요`
+   - `문의처`
+   - `접수`
+   - `제출서류`
+   - `컨소시엄`
+7. Create/update `공고_모니터링.xlsx` at the output root.
+
+Current output root:
+
+- Default: project-local `.openharness/proposal_outputs`
+- Override: `OPENHARNESS_PROPOSAL_OUTPUT_DIR`
+
+Current limitation:
+
+- Multi-file folder upload and folder monitoring are not implemented yet.
+- The first pass saves the uploaded file and generates workbooks for the analyzed notice.
+- Monitoring workbook updates are implemented by regenerating the workbook from a JSON sidecar.
+
 ## Future Configurable Inputs
 
 - Role book: 담당자, 기본 역할, +1 매니저 업무, 연락 채널, 대체 담당자.

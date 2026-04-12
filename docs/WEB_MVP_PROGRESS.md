@@ -644,6 +644,29 @@ Reason:
 
 Operational rule:
 - Use `bash scripts/run_web_mvp.sh` for local Web MVP review and development.
+
+## 2026-04-12 Announcement Agent Workbook Generation
+
+Developed:
+- Added the first `공고 에이전트` automation service.
+- The service creates a project folder named with the rule `제출마감일-전문기관약자-사업명`.
+- The uploaded source file is saved under `00_공고_원문`.
+- The service generates `총괄장.xlsx` with these tabs:
+  - `사업개요`
+  - `문의처`
+  - `접수`
+  - `제출서류`
+  - `컨소시엄`
+- The service creates or updates root-level `공고_모니터링.xlsx`.
+- Added a small stdlib XLSX writer to avoid adding Excel dependencies before the workbook shape stabilizes.
+- Added generated-file paths to the Proposal Ops UI.
+
+Configuration:
+- Default output root is `.openharness/proposal_outputs`.
+- Set `OPENHARNESS_PROPOSAL_OUTPUT_DIR` to use a company-designated parent folder later.
+
+Current limitation:
+- Multi-file folder upload, folder monitoring, automatic movement of whole upload bundles, and approval-gated execution UI remain next steps.
 - `.venv/bin/python -m ruff check src/openharness/services/rag_types.py src/openharness/services/rag_retrieval.py src/openharness/services/rag_metadata.py scripts/web_mvp_server.py tests/test_services/test_rag_core.py tests/test_services/test_web_mvp_rag.py`
 - `/home/kiakiakia/.vscode-server/bin/07ff9d6178ede9a1bd12ad3399074d726ebe6e43/node --check frontend/web/app.js`
 - Real Web MVP smoke test on `http://127.0.0.1:8010` with `openai-compatible`:

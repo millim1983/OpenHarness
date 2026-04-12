@@ -37,6 +37,7 @@ const navButtons = Array.from(document.querySelectorAll(".nav-button[data-target
 const workspaceViews = Array.from(document.querySelectorAll(".workspace-view[data-view]"));
 const proposalOpsOutput = document.querySelector("#proposalOpsOutput");
 const copyProposalOpsButton = document.querySelector("#copyProposalOpsButton");
+const announcementAgentMeta = document.querySelector("#announcementAgentMeta");
 
 async function loadProfiles() {
   setStatus("Loading profiles...");
@@ -481,6 +482,18 @@ function formatProposalOpsPlan(plan) {
   return lines.join("\n").trim();
 }
 
+function formatAnnouncementAgentMeta(agent) {
+  if (!agent || typeof agent !== "object" || !agent.enabled) {
+    return "No generated files yet.";
+  }
+  return [
+    `Project folder: ${agent.project_dir || "unknown"}`,
+    `Saved source files: ${Array.isArray(agent.saved_source_files) ? agent.saved_source_files.length : 0}`,
+    `총괄장: ${agent.summary_workbook || "not generated"}`,
+    `공고 모니터링: ${agent.monitoring_workbook || "not generated"}`,
+  ].join("\n");
+}
+
 function appendObjectList(lines, title, items, formatter) {
   if (!Array.isArray(items) || items.length === 0) {
     return;
@@ -874,6 +887,7 @@ async function processDocument() {
     documentStructuredOutput.textContent = formatStructuredInsights(payload.structured);
     documentExecutionOutput.textContent = formatExecutionPlan(payload.structured);
     proposalOpsOutput.textContent = formatProposalOpsPlan(payload.proposal_ops);
+    announcementAgentMeta.textContent = formatAnnouncementAgentMeta(payload.announcement_agent);
     renderRagDocuments(payload.rag || {});
     await loadIngestionState();
     setStatus(`Document processed with ${payload.profile}. ${formatRagStatus(payload.rag)}`);
