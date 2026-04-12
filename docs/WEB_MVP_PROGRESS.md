@@ -126,14 +126,21 @@ If the prompt shows something like (openharness-ai), the virtual environment is 
 From ~/workspace/OpenHarness:
 
 ```bash
-source .venv/bin/activate
-uv sync
-uv run python scripts/web_mvp_server.py
+bash scripts/run_web_mvp.sh
 ```
 
 Then open:
 
-`http://127.0.0.1:8008`
+`http://127.0.0.1:8013`
+
+Use `scripts/run_web_mvp.sh` instead of invoking `scripts/web_mvp_server.py` directly in Codex/snap
+sessions. The script pins:
+
+- `OPENHARNESS_CONFIG_DIR=/home/kiakiakia/.openharness`
+- `OPENHARNESS_DATA_DIR=/home/kiakiakia/.openharness/data`
+
+Without those variables, snap-based sessions may resolve `Path.home()` to
+`/home/kiakiakia/snap/codex/34` and create a separate empty RAG database.
 
 ## What Has Been Verified
 Verified successfully:
@@ -620,6 +627,23 @@ Verified:
 Next plan:
 - Add persistence for proposal projects/tasks/questions instead of only returning preview payloads.
 - Add a preview/approve/execute boundary before any folder creation, file moves, file writes, or message sends.
+
+## 2026-04-12 Fixed Web MVP Runtime Data Path
+
+Developed:
+- Added `scripts/run_web_mvp.sh`.
+- The script pins config/data directories to the normal user OpenHarness directory:
+  - `/home/kiakiakia/.openharness`
+  - `/home/kiakiakia/.openharness/data`
+- The script defaults the Web MVP server to `http://127.0.0.1:8013`.
+
+Reason:
+- Codex is running in a snap environment where `HOME` can resolve to `/home/kiakiakia/snap/codex/34`.
+- Directly running `scripts/web_mvp_server.py` in that environment makes OpenHarness look at the wrong RAG DB.
+- Existing uploaded/RAG documents are under `/home/kiakiakia/.openharness/data/rag/...`.
+
+Operational rule:
+- Use `bash scripts/run_web_mvp.sh` for local Web MVP review and development.
 - `.venv/bin/python -m ruff check src/openharness/services/rag_types.py src/openharness/services/rag_retrieval.py src/openharness/services/rag_metadata.py scripts/web_mvp_server.py tests/test_services/test_rag_core.py tests/test_services/test_web_mvp_rag.py`
 - `/home/kiakiakia/.vscode-server/bin/07ff9d6178ede9a1bd12ad3399074d726ebe6e43/node --check frontend/web/app.js`
 - Real Web MVP smoke test on `http://127.0.0.1:8010` with `openai-compatible`:
