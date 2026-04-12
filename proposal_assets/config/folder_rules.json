@@ -1,0 +1,14 @@
+{
+  "announcement_project_folder_pattern": "{deadline_yymmdd}-{agency_label}-{project_name}",
+  "deadline_source_fields": ["submission_deadline", "end_at"],
+  "deadline_format": "yymmdd",
+  "agency_source_fields": [
+    "agency",
+    "professional_agency",
+    "dedicated_agency",
+    "ordering_agency",
+    "client"
+  ],
+  "unknown_deadline_label": "마감일확인",
+  "unknown_agency_label": "기관확인"
+}

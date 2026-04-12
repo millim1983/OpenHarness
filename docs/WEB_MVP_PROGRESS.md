@@ -669,9 +669,23 @@ Current limitation:
 - Multi-file folder upload, folder monitoring, automatic movement of whole upload bundles, and approval-gated execution UI remain next steps.
 
 Update:
-- Added an agency alias dictionary at `src/openharness/services/workflows/agency_aliases.py`.
+- Added an agency alias dictionary at `proposal_assets/config/agency_aliases.json`.
 - Folder naming now preserves hyphen separators, e.g. `260501-KIAT-사업명`.
 - Agency extraction checks business-type variants such as `agency`, `professional_agency`, `dedicated_agency`, `ordering_agency`, and `client`.
+
+## 2026-04-13 Proposal Config Split And Feature Flags
+
+Developed:
+- Added `proposal_assets/manuals/proposal_agents_design.md` as the source design manual.
+- Added proposal automation config files under `proposal_assets/config/`.
+- Added `proposal_config.py` to load config files and feature flags.
+- Moved agency alias management to `proposal_assets/config/agency_aliases.json`.
+- Moved folder naming and folder tree rules to config.
+- Added feature flags for announcement-agent generation and future proposal-submission automation.
+
+Operational rule:
+- New advanced behavior should be introduced behind a feature flag first.
+- Final online submission remains human-only and must not be enabled through automation.
 - `.venv/bin/python -m ruff check src/openharness/services/rag_types.py src/openharness/services/rag_retrieval.py src/openharness/services/rag_metadata.py scripts/web_mvp_server.py tests/test_services/test_rag_core.py tests/test_services/test_web_mvp_rag.py`
 - `/home/kiakiakia/.vscode-server/bin/07ff9d6178ede9a1bd12ad3399074d726ebe6e43/node --check frontend/web/app.js`
 - Real Web MVP smoke test on `http://127.0.0.1:8010` with `openai-compatible`:

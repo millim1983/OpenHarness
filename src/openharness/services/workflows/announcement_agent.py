@@ -11,6 +11,11 @@ from typing import Any
 
 from openharness.services.workflows.agency_aliases import resolve_agency_label
 from openharness.services.workflows.proposal_ops import build_proposal_ops_preview
+from openharness.services.workflows.proposal_config import (
+    feature_enabled,
+    load_folder_rules,
+    load_folder_tree,
+)
 from openharness.services.workflows.xlsx_writer import write_xlsx
 
 
@@ -33,6 +38,8 @@ class AnnouncementAgentRequest:
 
 def run_announcement_agent(request: AnnouncementAgentRequest) -> dict[str, Any]:
     """Create the first filesystem outputs for an analyzed announcement."""
+    if not feature_enabled("announcement_agent", True):
+        return {"enabled": False, "reason": "announcement_agent feature flag is disabled."}
     output_root = Path(
         request.output_root
         or os.environ.get("OPENHARNESS_PROPOSAL_OUTPUT_DIR", "")
@@ -44,13 +51,27 @@ def run_announcement_agent(request: AnnouncementAgentRequest) -> dict[str, Any]:
     title = str(overview.get("title") or Path(request.file_name).stem)
     deadline = _deadline_for_folder(schedule)
     agency = _agency_folder_label(structured)
-    folder_name = _safe_path_segment(f"{deadline}-{agency}-{title}")
+    folder_rules = load_folder_rules()
+    folder_pattern = str(
+        folder_rules.get("announcement_project_folder_pattern")
+        or "{deadline_yymmdd}-{agency_label}-{project_name}"
+    )
+    folder_name = _safe_path_segment(
+        folder_pattern.format(
+            deadline_yymmdd=deadline,
+            agency_label=agency,
+            project_name=title,
+        )
+    )
     project_dir = output_root / folder_name
     source_dir = project_dir / "00_공고_원문"
     source_dir.mkdir(parents=True, exist_ok=True)
 
     saved_source_path = source_dir / Path(request.file_name).name
-    saved_source_path.write_bytes(request.file_bytes)
+    saved_source_files: list[str] = []
+    if feature_enabled("announcement_agent.save_uploaded_source_files", True):
+        saved_source_path.write_bytes(request.file_bytes)
+        saved_source_files.append(str(saved_source_path))
 
     proposal_ops = build_proposal_ops_preview(
         request=_proposal_ops_request(
@@ -60,36 +81,44 @@ def run_announcement_agent(request: AnnouncementAgentRequest) -> dict[str, Any]:
             team_context=request.team_context,
         )
     )
-    for folder in proposal_ops["folder_plan"]:
-        (project_dir / Path(str(folder)).name).mkdir(parents=True, exist_ok=True)
+    configured_folders = load_folder_tree()
+    for folder in configured_folders:
+        (project_dir / folder).mkdir(parents=True, exist_ok=True)
 
     summary_workbook = project_dir / "99_관리로그" / SUMMARY_WORKBOOK_NAME
-    write_xlsx(summary_workbook, _summary_workbook_sheets(structured, proposal_ops))
+    generated_files: list[str] = []
+    if feature_enabled("announcement_agent.generate_summary_workbook", True):
+        write_xlsx(summary_workbook, _summary_workbook_sheets(structured, proposal_ops))
+        generated_files.append(str(summary_workbook))
 
     monitoring_json = output_root / MONITORING_JSON_NAME
-    monitoring_rows = _load_monitoring_rows(monitoring_json)
     row = _monitoring_row(request.file_name, structured)
-    monitoring_rows = [existing for existing in monitoring_rows if existing["source_file"] != row["source_file"]]
-    monitoring_rows.append(row)
-    monitoring_json.parent.mkdir(parents=True, exist_ok=True)
-    monitoring_json.write_text(
-        json.dumps(monitoring_rows, ensure_ascii=False, indent=2) + "\n",
-        encoding="utf-8",
-    )
     monitoring_workbook = output_root / MONITORING_WORKBOOK_NAME
-    write_xlsx(monitoring_workbook, {"공고목록": _monitoring_sheet_rows(monitoring_rows)})
+    if feature_enabled("announcement_agent.update_monitoring_workbook", True):
+        monitoring_rows = _load_monitoring_rows(monitoring_json)
+        monitoring_rows = [
+            existing for existing in monitoring_rows if existing["source_file"] != row["source_file"]
+        ]
+        monitoring_rows.append(row)
+        monitoring_json.parent.mkdir(parents=True, exist_ok=True)
+        monitoring_json.write_text(
+            json.dumps(monitoring_rows, ensure_ascii=False, indent=2) + "\n",
+            encoding="utf-8",
+        )
+        write_xlsx(monitoring_workbook, {"공고목록": _monitoring_sheet_rows(monitoring_rows)})
+        generated_files.append(str(monitoring_workbook))
 
     return {
         "enabled": True,
         "output_root": str(output_root),
         "project_dir": str(project_dir),
         "folder_name": folder_name,
-        "saved_source_files": [str(saved_source_path)],
+        "saved_source_files": saved_source_files,
         "summary_workbook": str(summary_workbook),
         "monitoring_workbook": str(monitoring_workbook),
         "monitoring_json": str(monitoring_json),
-        "generated_files": [str(summary_workbook), str(monitoring_workbook)],
-        "created_folders": [str(project_dir / Path(str(folder)).name) for folder in proposal_ops["folder_plan"]],
+        "generated_files": generated_files,
+        "created_folders": [str(project_dir / folder) for folder in configured_folders],
         "monitoring_row": row,
     }
 
@@ -277,24 +306,29 @@ def _load_monitoring_rows(path: Path) -> list[dict[str, str]]:
 
 
 def _deadline_for_folder(schedule: dict[str, Any]) -> str:
+    folder_rules = load_folder_rules()
+    unknown_deadline = str(folder_rules.get("unknown_deadline_label") or "마감일확인")
     raw = str(schedule.get("submission_deadline") or schedule.get("end_at") or "").strip()
     digits = "".join(char for char in raw if char.isdigit())
-    return digits[2:8] if len(digits) >= 8 else "마감일확인"
+    return digits[2:8] if len(digits) >= 8 else unknown_deadline
 
 
 def _agency_folder_label(structured: dict[str, Any]) -> str:
+    folder_rules = load_folder_rules()
     metadata = structured.get("metadata") if isinstance(structured.get("metadata"), dict) else {}
-    agency = str(
-        metadata.get("agency")
-        or metadata.get("professional_agency")
-        or metadata.get("dedicated_agency")
-        or metadata.get("ordering_agency")
-        or metadata.get("client")
-        or ""
-    ).strip()
+    source_fields = folder_rules.get("agency_source_fields", [])
+    if not isinstance(source_fields, list) or not source_fields:
+        source_fields = ["agency", "professional_agency", "dedicated_agency", "ordering_agency", "client"]
+    agency = ""
+    for field in source_fields:
+        agency = str(metadata.get(str(field)) or "").strip()
+        if agency:
+            break
     if agency:
-        return _safe_path_segment(resolve_agency_label(agency))
-    return "기관확인"
+        if feature_enabled("announcement_agent.use_agency_aliases", True):
+            return _safe_path_segment(resolve_agency_label(agency))
+        return _safe_path_segment(agency)
+    return str(folder_rules.get("unknown_agency_label") or "기관확인")
 
 
 def _mark(required_for: set[str], *candidates: str) -> str:

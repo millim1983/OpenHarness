@@ -82,3 +82,25 @@ def test_run_announcement_agent_uses_full_agency_name_when_alias_missing(
 
     assert result["folder_name"].startswith("260602-서울특별시-Smart_City_SI")
     assert result["monitoring_row"]["agency"] == "서울특별시"
+
+
+def test_run_announcement_agent_can_be_disabled(tmp_path: Path, monkeypatch) -> None:
+    config_dir = tmp_path / "config"
+    config_dir.mkdir()
+    (config_dir / "feature_flags.json").write_text(
+        '{"announcement_agent": false}\n',
+        encoding="utf-8",
+    )
+    monkeypatch.setenv("OPENHARNESS_PROPOSAL_CONFIG_DIR", str(config_dir))
+
+    result = run_announcement_agent(
+        AnnouncementAgentRequest(
+            file_name="notice.pdf",
+            file_bytes=b"pdf bytes",
+            output_root=tmp_path,
+            structured_analysis={},
+        )
+    )
+
+    assert result["enabled"] is False
+    assert not (tmp_path / "notice.pdf").exists()

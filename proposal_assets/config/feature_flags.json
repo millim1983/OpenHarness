@@ -1,0 +1,12 @@
+{
+  "announcement_agent": true,
+  "announcement_agent.save_uploaded_source_files": true,
+  "announcement_agent.generate_summary_workbook": true,
+  "announcement_agent.update_monitoring_workbook": true,
+  "announcement_agent.use_agency_aliases": true,
+  "proposal_submission_agent": false,
+  "proposal_submission_agent.send_messages": false,
+  "proposal_submission_agent.schedule_reminders": false,
+  "proposal_submission_agent.execute_file_moves": false,
+  "proposal_submission_agent.final_submit": false
+}

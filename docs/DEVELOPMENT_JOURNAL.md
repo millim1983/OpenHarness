@@ -24,3 +24,4 @@
 - Added `scripts/run_web_mvp.sh` to pin OpenHarness config/data paths outside the snap HOME.
 - Started the announcement agent automation path for generated project folders and Excel workbooks.
 - Updated announcement-agent folder naming to `yymmdd-전문기관약자 또는 전문기관명-사업명`.
+- Split proposal automation settings into `proposal_assets/config/` and added feature flags.

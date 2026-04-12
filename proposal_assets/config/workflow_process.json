@@ -1,0 +1,17 @@
+{
+  "stages": [
+    {"stage": 0, "name": "기획", "required_items": ["rr_confirmed", "schedule_confirmed"], "approval_roles": ["COORDINATOR"]},
+    {"stage": 1, "name": "온라인 접수", "required_items": ["iris_all_joined", "task_number_issued", "consortium_configured"], "approval_roles": ["SUBMISSION_MANAGER"]},
+    {"stage": 2, "name": "제출 서류", "required_items": ["documents_distributed", "collection_started"], "approval_roles": []},
+    {"stage": 3, "name": "예산", "required_items": ["budget_approved", "researchers_confirmed"], "approval_roles": ["BUDGET_OWNER"]},
+    {"stage": 4, "name": "제안서 작성", "required_items": ["proposal_completed", "quality_check_passed", "all_documents_collected"], "approval_roles": ["QUALITY", "PROPOSAL_LEAD"], "final_action": "HUMAN_ONLY"}
+  ],
+  "automation_types": ["AUTO", "ASSIST", "HUMAN"],
+  "rules": {
+    "final_submission": "HUMAN_ONLY",
+    "budget_approval_required_before_stage_4": true,
+    "max_notifications_per_item_per_day": 2,
+    "require_rag_source_references": true,
+    "require_confidence_scores": true
+  }
+}

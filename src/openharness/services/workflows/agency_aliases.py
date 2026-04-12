@@ -3,25 +3,7 @@
 from __future__ import annotations
 
 
-AGENCY_ALIASES: dict[str, str] = {
-    "한국산업기술진흥원": "KIAT",
-    "KIAT": "KIAT",
-    "한국산업기술기획평가원": "KEIT",
-    "KEIT": "KEIT",
-    "중소기업기술정보진흥원": "TIPA",
-    "TIPA": "TIPA",
-    "정보통신기획평가원": "IITP",
-    "IITP": "IITP",
-    "한국에너지기술평가원": "KETEP",
-    "KETEP": "KETEP",
-    "한국콘텐츠진흥원": "KOCCA",
-    "KOCCA": "KOCCA",
-    "한국인터넷진흥원": "KISA",
-    "KISA": "KISA",
-    "한국지능정보사회진흥원": "NIA",
-    "NIA": "NIA",
-    "조달청": "PPS",
-}
+from openharness.services.workflows.proposal_config import load_agency_aliases
 
 
 def resolve_agency_label(value: str) -> str:
@@ -29,13 +11,14 @@ def resolve_agency_label(value: str) -> str:
     cleaned = value.strip()
     if not cleaned:
         return ""
-    if cleaned in AGENCY_ALIASES:
-        return AGENCY_ALIASES[cleaned]
+    aliases = load_agency_aliases()
+    if cleaned in aliases:
+        return aliases[cleaned]
     normalized = _normalize(cleaned)
-    for agency, abbreviation in AGENCY_ALIASES.items():
+    for agency, abbreviation in aliases.items():
         if normalized == _normalize(agency):
             return abbreviation
-    for agency, abbreviation in AGENCY_ALIASES.items():
+    for agency, abbreviation in aliases.items():
         normalized_agency = _normalize(agency)
         if normalized_agency and normalized_agency in normalized:
             return abbreviation

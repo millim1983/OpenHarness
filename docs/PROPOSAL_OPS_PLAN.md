@@ -84,7 +84,7 @@ Current limitation:
 
 The announcement agent uses an agency alias dictionary for the folder name.
 
-- Alias source: `src/openharness/services/workflows/agency_aliases.py`
+- Alias source: `proposal_assets/config/agency_aliases.json`
 - If the extracted agency matches a known agency, use the managed abbreviation.
 - If no alias exists, use the full extracted agency name.
 - The extracted agency field may be called `agency`, `professional_agency`, `dedicated_agency`, `ordering_agency`, or `client` depending on business type.
@@ -94,6 +94,27 @@ The agency means the organization responsible for evaluation/administration:
 - SI: 발주처
 - R&D: 전문기관
 - Non-R&D/support programs: 전담기관 or 사업담당부서
+
+## Config Files
+
+Proposal automation settings are separated from code under `proposal_assets/config/`.
+
+- `agency_aliases.json`: 전문기관/전담기관/발주처 alias dictionary.
+- `feature_flags.json`: feature on-off switches.
+- `folder_rules.json`: folder naming rule and source-field priority.
+- `folder_tree.json`: generated project folder tree.
+- `role_book.json`: role labels and default owners.
+- `workflow_process.json`: proposal submission stages, automation types, and safety rules.
+
+Runtime override:
+
+- Set `OPENHARNESS_PROPOSAL_CONFIG_DIR` to load a different config directory.
+
+Feature flag policy:
+
+- Advanced or risky features should be gated behind `feature_flags.json`.
+- File writes, file moves, message sends, reminder scheduling, and final submission actions must be individually gated.
+- `proposal_submission_agent.final_submit` must stay disabled; final submission is human-only.
 
 ## Future Configurable Inputs
 
