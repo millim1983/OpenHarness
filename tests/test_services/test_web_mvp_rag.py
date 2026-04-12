@@ -1,0 +1,273 @@
+from __future__ import annotations
+
+import importlib.util
+import base64
+from types import SimpleNamespace
+from pathlib import Path
+
+from openharness.config.settings import ProviderProfile, Settings
+from openharness.services.rag_store import RagStore
+from openharness.services.rag_types import ChunkRecord, IndexedDocument
+
+
+class FakeEmbeddingBackend:
+    def embed_texts(self, texts: list[str]) -> list[list[float]]:
+        return [[1.0, 0.0] for _ in texts]
+
+
+class FakeChatStore:
+    def list_documents(self) -> list[IndexedDocument]:
+        return [IndexedDocument(id=1, file_name="notice.txt", content_hash="abc", chunk_count=1)]
+
+    def load_all_chunks(self) -> list[ChunkRecord]:
+        return [
+            ChunkRecord(
+                id=1,
+                document_id=1,
+                chunk_index=0,
+                text="The application deadline is Friday at 18:00.",
+                start_char=0,
+                end_char=44,
+                embedding=[1.0, 0.0],
+            )
+        ]
+
+    def get_document_metadata(self, document_id: int) -> dict[str, object]:
+        assert document_id == 1
+        return {
+            "embedding_profile": "openai-compatible",
+            "chat_profile": "gemini-compatible",
+            "document_type": "announcement",
+            "title": "Funding notice",
+            "ministry": "Industry Ministry",
+            "agency": "Program office",
+            "rd_or_non_rd": "non_rd",
+            "business_type": "Commercialization",
+            "submission_deadline": "Friday at 18:00",
+        }
+
+    def get_file_name(self, document_id: int) -> str:
+        assert document_id == 1
+        return "notice.txt"
+
+    def get_document_artifact(self, document_id: int) -> dict[str, object]:
+        assert document_id == 1
+        return {}
+
+    def load_chunks_for_document(self, document_id: int) -> list[ChunkRecord]:
+        assert document_id == 1
+        return self.load_all_chunks()
+
+
+def load_web_mvp_server():
+    module_path = Path(__file__).resolve().parents[2] / "scripts" / "web_mvp_server.py"
+    spec = importlib.util.spec_from_file_location("web_mvp_server", module_path)
+    assert spec is not None
+    module = importlib.util.module_from_spec(spec)
+    assert spec.loader is not None
+    spec.loader.exec_module(module)
+    return module
+
+
+def settings_with_profiles() -> Settings:
+    return Settings(
+        active_profile="gemini-compatible",
+        profiles={
+            "gemini-compatible": ProviderProfile(
+                label="Gemini Compatible",
+                provider="gemini",
+                api_format="openai",
+                auth_source="openai_api_key",
+                default_model="gemini-2.5-pro",
+                base_url="https://example.test/v1",
+            ),
+            "openai-compatible": ProviderProfile(
+                label="OpenAI Compatible",
+                provider="openai",
+                api_format="openai",
+                auth_source="openai_api_key",
+                default_model="gpt-5.4",
+            ),
+        },
+    )
+
+
+def test_run_chat_attaches_rag_context(monkeypatch) -> None:
+    module = load_web_mvp_server()
+    captured: dict[str, str] = {}
+
+    monkeypatch.setattr(module, "load_settings", settings_with_profiles)
+    monkeypatch.setattr(
+        module,
+        "create_embedding_backend_for_profile",
+        lambda *args, **kwargs: FakeEmbeddingBackend(),
+    )
+    monkeypatch.setattr(
+        module.RagStore, "for_project", classmethod(lambda cls, cwd: FakeChatStore())
+    )
+
+    def fake_run_single_prompt_sync(
+        *, profile_name: str, message: str, cwd: str, system_prompt: str = ""
+    ) -> dict[str, str]:
+        captured["profile_name"] = profile_name
+        captured["message"] = message
+        captured["cwd"] = cwd
+        captured["system_prompt"] = system_prompt
+        return {"profile": profile_name, "answer": "Use Friday."}
+
+    monkeypatch.setattr(module, "run_single_prompt_sync", fake_run_single_prompt_sync)
+
+    result = module._run_chat("gemini-compatible", "When is the deadline?")
+
+    assert result["rag"]["enabled"] is True
+    assert result["rag"]["retrieved_chunk_count"] == 1
+    assert result["rag"]["sources"][0]["document_type"] == "announcement"
+    assert result["rag"]["sources"][0]["rd_or_non_rd"] == "non_rd"
+    assert "Retrieved document context" in captured["message"]
+    assert "notice.txt#0" in captured["message"]
+    assert "When is the deadline?" in captured["message"]
+
+
+def test_run_chat_applies_rag_filters(monkeypatch) -> None:
+    module = load_web_mvp_server()
+    captured: dict[str, str] = {}
+
+    monkeypatch.setattr(module, "load_settings", settings_with_profiles)
+    monkeypatch.setattr(
+        module,
+        "create_embedding_backend_for_profile",
+        lambda *args, **kwargs: FakeEmbeddingBackend(),
+    )
+    monkeypatch.setattr(
+        module.RagStore, "for_project", classmethod(lambda cls, cwd: FakeChatStore())
+    )
+
+    def fake_run_single_prompt_sync(
+        *, profile_name: str, message: str, cwd: str, system_prompt: str = ""
+    ) -> dict[str, str]:
+        captured["message"] = message
+        return {"profile": profile_name, "answer": "No matching context."}
+
+    monkeypatch.setattr(module, "run_single_prompt_sync", fake_run_single_prompt_sync)
+
+    result = module._run_chat(
+        "gemini-compatible",
+        "When is the deadline?",
+        module.RagRetrievalFilters(document_type="technical"),
+    )
+
+    assert result["rag"]["enabled"] is False
+    assert result["rag"]["retrieved_chunk_count"] == 0
+    assert result["rag"]["applied_filters"] == {
+        "document_type": "technical",
+        "ministry": "",
+        "agency": "",
+        "rd_or_non_rd": "",
+        "business_type": "",
+    }
+    assert "Retrieved document context" not in captured["message"]
+
+
+def test_index_document_for_rag_returns_document_status(tmp_path: Path, monkeypatch) -> None:
+    module = load_web_mvp_server()
+    store = RagStore(tmp_path / "rag.sqlite3")
+
+    monkeypatch.setattr(module, "load_settings", settings_with_profiles)
+    monkeypatch.setattr(
+        module,
+        "create_embedding_backend_for_profile",
+        lambda *args, **kwargs: FakeEmbeddingBackend(),
+    )
+    monkeypatch.setattr(module.RagStore, "for_project", classmethod(lambda cls, cwd: store))
+
+    status = module._index_document_for_rag(
+        chat_profile_name="gemini-compatible",
+        file_name="notice.txt",
+        extracted_text="Budget support is available.\n\nThe application deadline is Friday.",
+        instruction="Focus on deadlines.",
+        team_context="Alex PM: submission",
+    )
+
+    assert status["enabled"] is True
+    assert status["embedding_profile"] == "openai-compatible"
+    assert status["indexed_document_count"] == 1
+    assert status["indexed_chunk_count"] >= 1
+    assert status["documents"][0]["file_name"] == "notice.txt"
+    assert status["documents"][0]["document_type"] == "announcement"
+    assert status["documents"][0]["title"] == "Budget support is available."
+
+
+def test_run_document_summary_stores_detail_artifact(tmp_path: Path, monkeypatch) -> None:
+    module = load_web_mvp_server()
+    store = RagStore(tmp_path / "rag.sqlite3")
+
+    monkeypatch.setattr(module, "load_settings", settings_with_profiles)
+    monkeypatch.setattr(
+        module,
+        "create_embedding_backend_for_profile",
+        lambda *args, **kwargs: FakeEmbeddingBackend(),
+    )
+    monkeypatch.setattr(module.RagStore, "for_project", classmethod(lambda cls, cwd: store))
+    monkeypatch.setattr(
+        module,
+        "run_announcement_analysis",
+        lambda *args, **kwargs: SimpleNamespace(
+            workflow_name="announcement_analysis",
+            summary="Stored summary",
+            structured={
+                "announcement_overview": {"title": "Stored notice"},
+                "internal_execution_plan": {"immediate_next_actions": ["Call owner"]},
+            },
+            prompt_source_truncated=False,
+        ),
+    )
+
+    result = module._run_document_summary(
+        "gemini-compatible",
+        "notice.txt",
+        base64.b64encode(b"Application deadline is Friday.").decode("ascii"),
+        "Use stored instruction",
+        "Alex PM",
+        "Use stored system prompt",
+    )
+    detail = module._get_rag_document_detail(result["rag"]["indexed_document_id"])
+
+    assert detail["artifact_available"] is True
+    assert detail["summary"] == "Stored summary"
+    assert detail["structured"]["internal_execution_plan"]["immediate_next_actions"] == [
+        "Call owner"
+    ]
+
+
+def test_rag_document_management_helpers(tmp_path: Path, monkeypatch) -> None:
+    module = load_web_mvp_server()
+    store = RagStore(tmp_path / "rag.sqlite3")
+
+    monkeypatch.setattr(module, "load_settings", settings_with_profiles)
+    monkeypatch.setattr(
+        module,
+        "create_embedding_backend_for_profile",
+        lambda *args, **kwargs: FakeEmbeddingBackend(),
+    )
+    monkeypatch.setattr(module.RagStore, "for_project", classmethod(lambda cls, cwd: store))
+
+    indexed = module._index_document_for_rag(
+        chat_profile_name="gemini-compatible",
+        file_name="notice.txt",
+        extracted_text="Budget support is available.\n\nThe application deadline is Friday.",
+        instruction="Focus on deadlines.",
+        team_context="Alex PM: submission",
+    )
+    document_id = indexed["indexed_document_id"]
+
+    listed = module._list_rag_documents()
+    assert listed["indexed_document_count"] == 1
+    assert listed["documents"][0]["file_name"] == "notice.txt"
+
+    reindexed = module._reindex_rag_document(document_id, "gemini-compatible")
+    assert reindexed["reindexed_document_id"] == document_id
+    assert reindexed["embedding_profile"] == "openai-compatible"
+
+    deleted = module._delete_rag_document(document_id)
+    assert deleted["deleted_document_id"] == document_id
+    assert deleted["indexed_document_count"] == 0

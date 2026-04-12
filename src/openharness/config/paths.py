@@ -6,6 +6,7 @@ Follows XDG-like conventions with ~/.openharness/ as the default base directory.
 from __future__ import annotations
 
 import os
+from hashlib import sha1
 from pathlib import Path
 
 _DEFAULT_BASE_DIR = ".openharness"
@@ -114,3 +115,17 @@ def get_project_issue_file(cwd: str | Path) -> Path:
 def get_project_pr_comments_file(cwd: str | Path) -> Path:
     """Return the per-project PR comments context file."""
     return get_project_config_dir(cwd) / "pr_comments.md"
+
+
+def get_project_rag_dir(cwd: str | Path) -> Path:
+    """Return the per-project directory for RAG data."""
+    project_path = Path(cwd).resolve()
+    digest = sha1(str(project_path).encode("utf-8")).hexdigest()[:12]
+    rag_dir = get_data_dir() / "rag" / f"{project_path.name}-{digest}"
+    rag_dir.mkdir(parents=True, exist_ok=True)
+    return rag_dir
+
+
+def get_project_rag_db_path(cwd: str | Path) -> Path:
+    """Return the SQLite path for project-local RAG storage."""
+    return get_project_rag_dir(cwd) / "documents.sqlite3"

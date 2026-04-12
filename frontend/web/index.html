@@ -1,0 +1,195 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>OpenHarness Web MVP</title>
+    <link rel="stylesheet" href="./styles.css">
+  </head>
+  <body>
+    <main class="app-shell">
+      <section class="hero-card">
+        <p class="eyebrow">OpenHarness Web MVP</p>
+        <h1>Simple browser chat for fast model checks</h1>
+        <p class="intro">
+          Pick a configured profile, send one message, and inspect the answer without leaving the browser.
+        </p>
+      </section>
+
+      <section class="chat-card">
+        <div class="toolbar">
+          <label class="field">
+            <span>Profile</span>
+            <select id="profileSelect"></select>
+          </label>
+          <button id="refreshProfilesButton" class="ghost-button" type="button">Refresh Profiles</button>
+        </div>
+
+        <label class="field">
+          <span>Message</span>
+          <textarea
+            id="messageInput"
+            rows="6"
+            placeholder="Ask something simple first. For example: Summarize what OpenHarness is in 3 bullet points."
+          ></textarea>
+        </label>
+        <p class="helper-text">
+          Uploaded documents are indexed for local RAG when an OpenAI-compatible embedding profile is configured. Follow-up chat will use retrieved document context when chunks are available.
+        </p>
+
+        <section class="project-context-panel">
+          <div class="response-header">
+            <h2>Project Context</h2>
+            <button id="saveProjectContextButton" class="ghost-button" type="button">Save Defaults</button>
+          </div>
+          <label class="field">
+            <span>System Prompt</span>
+            <textarea
+              id="systemPromptInput"
+              rows="4"
+              placeholder="How this workspace should think and respond."
+            ></textarea>
+          </label>
+          <p class="helper-text">
+            These defaults are reused for chat and document analysis. Change them once, then upload normally.
+          </p>
+        </section>
+
+        <section class="rag-filter-panel">
+          <h2>RAG Filters</h2>
+          <div class="rag-filter-grid">
+            <label class="field">
+              <span>Document Type</span>
+              <select id="ragFilterDocumentType">
+                <option value="">Any</option>
+                <option value="announcement">Announcement</option>
+                <option value="regulation">Regulation</option>
+                <option value="technical">Technical</option>
+                <option value="company_team">Company/team</option>
+                <option value="unknown">Unknown</option>
+              </select>
+            </label>
+            <label class="field">
+              <span>Ministry</span>
+              <input id="ragFilterMinistry" type="text" placeholder="Any ministry">
+            </label>
+            <label class="field">
+              <span>Agency</span>
+              <input id="ragFilterAgency" type="text" placeholder="Any agency">
+            </label>
+            <label class="field">
+              <span>R&amp;D Type</span>
+              <select id="ragFilterRdType">
+                <option value="">Any</option>
+                <option value="rd">R&amp;D</option>
+                <option value="non_rd">Non-R&amp;D</option>
+              </select>
+            </label>
+            <label class="field">
+              <span>Business Type</span>
+              <input id="ragFilterBusinessType" type="text" placeholder="Any business type">
+            </label>
+          </div>
+        </section>
+
+        <div class="actions">
+          <button id="sendButton" class="primary-button" type="button">Send</button>
+          <p id="statusText" class="status-text">Ready</p>
+        </div>
+
+        <section class="response-panel">
+          <div class="response-header">
+            <h2>Answer</h2>
+            <button id="copyButton" class="ghost-button" type="button">Copy</button>
+          </div>
+          <pre id="responseOutput">No response yet.</pre>
+          <div class="source-panel">
+            <h3>RAG Sources</h3>
+            <pre id="ragSourceOutput">No retrieval sources yet.</pre>
+          </div>
+        </section>
+
+        <section class="rag-dashboard">
+          <div class="response-header">
+            <h2>RAG Document Dashboard</h2>
+            <button id="refreshRagButton" class="ghost-button" type="button">Refresh RAG</button>
+          </div>
+          <div class="rag-stats" id="ragStats">No RAG documents loaded yet.</div>
+          <div class="rag-db-path" id="ragDbPath">DB path unavailable.</div>
+          <div class="rag-document-list" id="ragDocumentList"></div>
+        </section>
+
+        <section class="document-panel">
+          <div class="response-header">
+            <h2>Announcement Analysis</h2>
+            <button id="processDocumentButton" class="primary-button" type="button">Upload and Analyze</button>
+          </div>
+
+          <label class="field">
+            <span>Document File</span>
+            <input id="documentInput" type="file" accept=".txt,.md,.csv,.json,.yaml,.yml,.docx,.pdf">
+          </label>
+          <p class="helper-text">
+            PDF extraction needs the `pypdf` package in the project venv. After pulling this change, run `uv sync` in WSL once before testing PDFs.
+          </p>
+
+          <label class="field">
+            <span>Default Instruction</span>
+            <textarea
+              id="documentInstructionInput"
+              rows="3"
+              placeholder="Focus on consortium rules, required documents, and deadlines."
+            ></textarea>
+          </label>
+
+          <label class="field">
+            <span>Default Team Context</span>
+            <textarea
+              id="teamContextInput"
+              rows="5"
+              placeholder="Alex PM: schedule management, final submission&#10;Finance Lead: budget review, finance documents&#10;CEO: demand company outreach, consortium negotiation"
+            ></textarea>
+          </label>
+
+          <div class="document-meta" id="documentMeta">No document processed yet.</div>
+
+          <div class="document-results">
+            <section class="response-panel">
+              <div class="response-header">
+                <h2>Extracted Text</h2>
+                <button id="copyExtractedButton" class="ghost-button" type="button">Copy</button>
+              </div>
+              <pre id="documentExtractOutput">No extracted text yet.</pre>
+            </section>
+
+            <section class="response-panel">
+              <div class="response-header">
+                <h2>Summary</h2>
+                <button id="copySummaryButton" class="ghost-button" type="button">Copy</button>
+              </div>
+              <pre id="documentSummaryOutput">No summary yet.</pre>
+            </section>
+
+            <section class="response-panel">
+              <div class="response-header">
+                <h2>Structured Insights</h2>
+                <button id="copyStructuredButton" class="ghost-button" type="button">Copy</button>
+              </div>
+              <pre id="documentStructuredOutput">No structured insights yet.</pre>
+            </section>
+
+            <section class="response-panel">
+              <div class="response-header">
+                <h2>Internal Execution</h2>
+                <button id="copyExecutionButton" class="ghost-button" type="button">Copy</button>
+              </div>
+              <pre id="documentExecutionOutput">No internal execution plan yet.</pre>
+            </section>
+          </div>
+        </section>
+      </section>
+    </main>
+
+    <script src="./app.js" defer></script>
+  </body>
+</html>
