@@ -1,0 +1,156 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>공고 운영 대시보드</title>
+<style>
+*{box-sizing:border-box;margin:0;padding:0}
+body{font-family:system-ui,sans-serif;background:#f5f5f3;color:#1a1a18;padding:24px}
+.badge{display:inline-block;font-size:11px;font-weight:500;padding:2px 8px;border-radius:20px}
+.badge-warning{background:#FAEEDA;color:#854F0B}
+.badge-danger{background:#FCEBEB;color:#A32D2D}
+.badge-info{background:#E6F1FB;color:#185FA5}
+.badge-success{background:#EAF3DE;color:#3B6D11}
+.check-item{display:flex;align-items:flex-start;gap:8px;padding:8px 0;border-bottom:0.5px solid #e0ddd6;font-size:13px}
+.check-item:last-child{border-bottom:none}
+.check-box{width:16px;height:16px;border-radius:3px;border:0.5px solid #ccc;flex-shrink:0;margin-top:1px;cursor:pointer;display:flex;align-items:center;justify-content:center}
+.check-box.done{background:#EAF3DE;border-color:#3B6D11}
+.check-box.done::after{content:'';width:8px;height:5px;border-left:1.5px solid #3B6D11;border-bottom:1.5px solid #3B6D11;transform:rotate(-45deg) translate(1px,-1px)}
+.role-tag{font-size:11px;padding:2px 6px;border-radius:4px;background:#f1f0e8;color:#666;white-space:nowrap}
+.section-title{font-size:11px;font-weight:500;color:#888;text-transform:uppercase;letter-spacing:.06em;margin-bottom:10px}
+.card{background:#fff;border:0.5px solid #e0ddd6;border-radius:12px;padding:16px}
+.row{display:grid;gap:12px}
+.cols2{grid-template-columns:1fr 1fr}
+.cols3{grid-template-columns:1fr 1fr 1fr}
+.metric{background:#f5f5f3;border-radius:8px;padding:12px 14px}
+.metric-label{font-size:12px;color:#888;margin-bottom:4px}
+.metric-value{font-size:22px;font-weight:500}
+.metric-sub{font-size:11px;color:#aaa;margin-top:2px}
+.progress-bar{height:6px;border-radius:3px;background:#e0ddd6;overflow:hidden;margin-top:6px}
+.progress-fill{height:100%;border-radius:3px;background:#378ADD}
+.question-item{display:flex;gap:10px;padding:8px 0;border-bottom:0.5px solid #e0ddd6;font-size:13px;align-items:flex-start}
+.question-item:last-child{border-bottom:none}
+.q-icon{width:18px;height:18px;border-radius:50%;background:#FAEEDA;display:flex;align-items:center;justify-content:center;flex-shrink:0;font-size:9px;font-weight:500;color:#854F0B;margin-top:1px}
+.folder-item{display:flex;align-items:center;gap:8px;padding:5px 0;font-size:13px;color:#666}
+.countdown{font-size:32px;font-weight:500;color:#A32D2D}
+.day-label{font-size:12px;color:#888;margin-top:2px}
+</style>
+</head>
+<body>
+
+<div style="display:flex;align-items:flex-start;justify-content:space-between;margin-bottom:16px;flex-wrap:wrap;gap:8px">
+  <div>
+    <div style="font-size:13px;color:#888;margin-bottom:4px">공고 에이전트 · 제안 운영</div>
+    <div style="font-size:17px;font-weight:500;line-height:1.4">AI 응용제품 신속 상용화 지원사업<br>신규지원 대상과제 공고</div>
+  </div>
+  <div style="text-align:right">
+    <div class="countdown" id="countdown">4</div>
+    <div class="day-label">일 남음 (4.17 18:00)</div>
+  </div>
+</div>
+
+<div class="row cols3" style="margin-bottom:12px">
+  <div class="metric">
+    <div class="metric-label">제출 서류</div>
+    <div class="metric-value"><span id="done-count">0</span><span style="font-size:14px;color:#888">/12</span></div>
+    <div class="progress-bar"><div class="progress-fill" id="progress" style="width:0%"></div></div>
+  </div>
+  <div class="metric">
+    <div class="metric-label">역할 배정</div>
+    <div class="metric-value" style="font-size:16px;padding-top:4px">3개 역할</div>
+    <div class="metric-sub">미배정 상태</div>
+  </div>
+  <div class="metric">
+    <div class="metric-label">사업 유형</div>
+    <div class="metric-value" style="font-size:15px;padding-top:4px">비R&D</div>
+    <div class="metric-sub">온라인 제출 (IRIS)</div>
+  </div>
+</div>
+
+<div class="row cols2" style="margin-bottom:12px">
+  <div class="card">
+    <div class="section-title">제출 체크리스트</div>
+    <div id="checklist">
+      <div class="check-item"><div class="check-box" onclick="toggle(this)"></div><div><div>제출 마감 재확인</div><div style="margin-top:2px"><span class="role-tag">사업관리</span></div></div></div>
+      <div class="check-item"><div class="check-box" onclick="toggle(this)"></div><div><div>사업계획서</div><div style="margin-top:2px"><span class="role-tag">사업관리</span></div></div></div>
+      <div class="check-item"><div class="check-box" onclick="toggle(this)"></div><div><div>사업자등록증</div><div style="margin-top:2px"><span class="role-tag">사업관리</span></div></div></div>
+      <div class="check-item"><div class="check-box" onclick="toggle(this)"></div><div><div>참여의사 확인서</div><div style="margin-top:2px"><span class="role-tag">사업관리</span></div></div></div>
+      <div class="check-item"><div class="check-box" onclick="toggle(this)"></div><div><div>개인정보 제공동의서</div><div style="margin-top:2px"><span class="role-tag">사업관리</span></div></div></div>
+      <div class="check-item"><div class="check-box" onclick="toggle(this)"></div><div><div>연구윤리·청렴 서약서</div><div style="margin-top:2px"><span class="role-tag">사업관리</span></div></div></div>
+      <div class="check-item"><div class="check-box" onclick="toggle(this)"></div><div><div>기업부설연구소 인정서</div><div style="margin-top:2px"><span class="role-tag">사업관리</span></div></div></div>
+      <div class="check-item"><div class="check-box" onclick="toggle(this)"></div><div><div>책임자 재직증명서</div><div style="margin-top:2px"><span class="role-tag">사업관리</span></div></div></div>
+      <div class="check-item"><div class="check-box" onclick="toggle(this)"></div><div><div>신청자격 적정성 확인서</div><div style="margin-top:2px"><span class="role-tag">사업관리</span></div></div></div>
+      <div class="check-item"><div class="check-box" onclick="toggle(this)"></div><div><div>수요기업 확약서</div><div style="margin-top:2px"><span class="role-tag">사업관리</span></div></div></div>
+      <div class="check-item"><div class="check-box" onclick="toggle(this)"></div><div><div>회계감사보고서/재무제표</div><div style="margin-top:2px"><span class="role-tag">사업관리</span></div></div></div>
+      <div class="check-item"><div class="check-box" onclick="toggle(this)"></div><div><div>온라인 접수 경로·계정 확인</div><div style="margin-top:2px"><span class="role-tag">사업관리</span></div></div></div>
+    </div>
+  </div>
+
+  <div style="display:flex;flex-direction:column;gap:12px">
+    <div class="card">
+      <div class="section-title">확인 필요 사항</div>
+      <div class="question-item"><div class="q-icon">!</div><div>컨소시엄(수요기업+공급기업) 필수 여부</div></div>
+      <div class="question-item"><div class="q-icon">!</div><div>기업부설연구소 보유 여부</div></div>
+      <div class="question-item"><div class="q-icon">!</div><div>기관부담금 현금 13% 이상 가능 여부</div></div>
+      <div class="question-item"><div class="q-icon">!</div><div>연차별 예산 배분 명확성</div></div>
+    </div>
+
+    <div class="card">
+      <div class="section-title">역할별 담당</div>
+      <div style="display:flex;flex-direction:column;gap:8px">
+        <div style="display:flex;justify-content:space-between;align-items:center;font-size:13px"><span>사업관리</span><span class="badge badge-warning">미배정</span></div>
+        <div style="display:flex;justify-content:space-between;align-items:center;font-size:13px"><span>제안서 본문</span><span class="badge badge-warning">미배정</span></div>
+        <div style="display:flex;justify-content:space-between;align-items:center;font-size:13px"><span>대표/의사결정</span><span class="badge badge-warning">미배정</span></div>
+      </div>
+    </div>
+
+    <div class="card">
+      <div class="section-title">생성 폴더</div>
+      <div class="folder-item">📁 00_공고_원문</div>
+      <div class="folder-item">📁 01_기획_검토</div>
+      <div class="folder-item">📁 02_제안서_본문</div>
+      <div class="folder-item">📁 03_제출서류</div>
+      <div class="folder-item">📁 04_증빙_날인</div>
+      <div class="folder-item">📁 05_온라인접수</div>
+      <div class="folder-item">📁 99_관리로그</div>
+    </div>
+  </div>
+</div>
+
+<div class="card">
+  <div class="section-title">리마인드 일정</div>
+  <div style="display:flex;gap:0;overflow:hidden;border-radius:6px;border:0.5px solid #e0ddd6">
+    <div style="flex:1;padding:10px 12px;background:#f5f5f3;border-right:0.5px solid #e0ddd6">
+      <div style="font-size:11px;color:#888">~D-4</div>
+      <div style="font-size:13px;font-weight:500;margin-top:2px">일 1회</div>
+      <div style="font-size:11px;color:#aaa;margin-top:2px">미완료 담당자</div>
+    </div>
+    <div style="flex:1;padding:10px 12px;background:#FCEBEB;border-right:0.5px solid #e0ddd6">
+      <div style="font-size:11px;color:#A32D2D">D-3 ~ 마감</div>
+      <div style="font-size:13px;font-weight:500;margin-top:2px;color:#A32D2D">오전/오후 2회</div>
+      <div style="font-size:11px;color:#A32D2D;margin-top:2px;opacity:.8">담당자 + 사업관리</div>
+    </div>
+    <div style="flex:2;padding:10px 12px;background:#f5f5f3">
+      <div style="font-size:11px;color:#888">메시지 채널</div>
+      <div style="font-size:13px;font-weight:500;margin-top:2px">연결 대기 중</div>
+      <div style="font-size:11px;color:#aaa;margin-top:2px">담당자 연락처 입력 필요</div>
+    </div>
+  </div>
+</div>
+
+<script>
+function toggle(el){
+  el.classList.toggle('done');
+  const items=document.querySelectorAll('.check-box');
+  const done=[...items].filter(i=>i.classList.contains('done')).length;
+  document.getElementById('done-count').textContent=done;
+  document.getElementById('progress').style.width=(done/12*100)+'%';
+}
+const now=new Date();
+const deadline=new Date('2026-04-17T18:00:00+09:00');
+const diff=Math.max(0,Math.ceil((deadline-now)/86400000));
+document.getElementById('countdown').textContent=diff;
+</script>
+</body>
+</html>

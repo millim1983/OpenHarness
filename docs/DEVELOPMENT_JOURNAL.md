@@ -78,3 +78,15 @@
 - **제안 운영 대시보드 피드백 반영**: 실제 공고 결과를 보고 대시보드에서 빠지거나 어색한 항목 수정.
 - **`extraction_schema.json` 필드 정밀화**: 실제 추출 결과를 보고 필드 정의나 extraction_rules 보완.
 - **`LATEST_HANDOFF.md` 업데이트**: 현재 구조에 맞게 핸드오프 문서 갱신.
+
+## 2026-04-14
+
+### GitHub 상태 정리
+- `private/web-mvp-rag`에 누락되어 있던 `71e2002 feat(web-mvp): RAG 기반 웹 MVP 기능 구현 및 UI 개선` 커밋을 푸시했다.
+- `origin/web-mvp-rag`와 `private/web-mvp-rag` 모두 `71e2002` 기준으로 맞췄다.
+- 로컬 전용 `.claude/settings.local.json`은 커밋 대상에서 제외하도록 `.gitignore`에 추가했다.
+
+### 다음 개발 방향: 지식 스토어 업그레이드
+- 다음 목표는 공고/규정을 읽고 누적되는 근거 기반 업무 지식 스토어를 만드는 것이다.
+- 당장 전용 Graph DB 서버를 붙이기보다 JSON 기반 지식 아이템 저장소와 relation index를 먼저 만들고, 기존 VectorDB/RAG와 연결한다.
+- 핵심 구현 순서는 지식 아이템 스키마, 공고 처리 중 후보 지식 추출 파이프라인, 사람이 `맞음`/`수정`/`문의필요` 등을 표시하는 검증 UI다.
