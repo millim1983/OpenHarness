@@ -90,3 +90,9 @@
 - 다음 목표는 공고/규정을 읽고 누적되는 근거 기반 업무 지식 스토어를 만드는 것이다.
 - 당장 전용 Graph DB 서버를 붙이기보다 JSON 기반 지식 아이템 저장소와 relation index를 먼저 만들고, 기존 VectorDB/RAG와 연결한다.
 - 핵심 구현 순서는 지식 아이템 스키마, 공고 처리 중 후보 지식 추출 파이프라인, 사람이 `맞음`/`수정`/`문의필요` 등을 표시하는 검증 UI다.
+
+### 암묵지 지식그래프 및 문서 파이프라인 계획
+- `docs/TACIT_KNOWLEDGE_GRAPH_PLAN.md`를 추가해 사용자 메모, 사후 회고, 문의 결과, 규정/공고 기반 지식을 graph-shaped card로 축적하는 계획을 기록했다.
+- 핵심은 원문 메모를 보존하되 에이전트가 `언제 꺼낼지`, `어떤 사업/부처/단계에 적용되는지`, `체크리스트인지 문의항목인지 규정근거인지`를 구조화해서 저장하는 것이다.
+- `docs/INGESTION_PIPELINE_PLAN.md`에 HWP, PDF, Word, PPT, Excel 등 혼합 문서 처리 방향을 추가했다.
+- 문서 처리는 모든 파일을 PDF로 변환하는 방식이 아니라 원본 보존, Markdown 정규화, Excel/표 JSON화, page/slide/sheet anchor 보존, VectorDB/RAG 및 지식카드 추출로 연결하는 방식으로 잡았다.

@@ -1,14 +1,14 @@
 # Latest Handoff
 
 ## 우분투 서버 이전
-Updated: 2026-04-14 17:15 KST
+Updated: 2026-04-14 17:40 KST
 
 ## GitHub
 
 - Private remote: `https://github.com/millim1983/openharness_mm.git`
 - Branch: `web-mvp-rag`
-- Latest pushed commit: `71e2002 feat(web-mvp): RAG 기반 웹 MVP 기능 구현 및 UI 개선`
-- `private/web-mvp-rag` and `origin/web-mvp-rag` currently point at `71e2002`.
+- Latest local commit: `docs: plan tacit knowledge graph pipeline`
+- `private/web-mvp-rag` and `origin/web-mvp-rag` should be pushed to this planning commit.
 - Original `upstream` is not used for this private development flow.
 
 ## Server Environment Variables
@@ -195,3 +195,17 @@ Each knowledge item should include:
    - Update tests after each step.
    - Keep `docs/DEVELOPMENT_JOURNAL.md` and this handoff file current.
    - Push completed increments to `private/web-mvp-rag`.
+
+## Tacit Knowledge And Document Pipeline Plans
+
+New planning docs:
+
+- `docs/TACIT_KNOWLEDGE_GRAPH_PLAN.md`: plan for capturing human tacit knowledge, post-submission lessons, inquiry results, and regulation/notice-derived knowledge as graph-shaped cards.
+- `docs/INGESTION_PIPELINE_PLAN.md`: expanded with a mixed document source pipeline for HWP, PDF, Word, PPT, Excel, Markdown/text, scanned images, notices, RFPs, and regulations.
+
+Key decision:
+
+- Do not store only free-form notes.
+- Do not convert every source file to PDF as the sole ingestion path.
+- Preserve originals, normalize narrative documents to Markdown, normalize structured data such as Excel to JSON tables, keep page/slide/sheet anchors, and store graph-ready relations.
+- Use JSON cards and `relations.json` first, with a later migration path to an embedded graph DB if relation queries become central.
