@@ -333,6 +333,71 @@
               </div>
             </section>
           </section>
+
+          <section id="knowledgeView" class="workspace-view" data-view="knowledge">
+            <section class="knowledge-panel">
+              <div class="response-header">
+                <h2>암묵지 메모</h2>
+                <button id="refreshKnowledgeButton" class="ghost-button" type="button">지식 새로고침</button>
+              </div>
+              <p class="helper-text">
+                사업 준비, 제출, 사후 회고에서 반복되는 체크포인트를 메모하면 구조화 초안으로 나눠 저장합니다.
+              </p>
+
+              <div class="knowledge-form-grid">
+                <label class="field">
+                  <span>사업구분</span>
+                  <input id="knowledgeBusinessDomainInput" type="text" placeholder="예: SI용역, R&D">
+                </label>
+                <label class="field">
+                  <span>부처</span>
+                  <input id="knowledgeMinistryInput" type="text" placeholder="예: 산업통상자원부">
+                </label>
+                <label class="field">
+                  <span>발주처/전문기관</span>
+                  <input id="knowledgeAgencyInput" type="text" placeholder="예: 한국철도공사">
+                </label>
+                <label class="field">
+                  <span>사업유형/케이스</span>
+                  <input id="knowledgeBusinessTypeInput" type="text" placeholder="예: 수요기관필수, 제출주의사항">
+                </label>
+              </div>
+
+              <label class="field">
+                <span>메모</span>
+                <textarea
+                  id="knowledgeMemoInput"
+                  rows="8"
+                  placeholder="예: SI 용역 제안서 제출 후 회고. 1. 현황 분석이 허술했다. 2. 부본 흑백 제출 조건을 놓치지 말 것. 3. 한글 회색 글씨는 PDF 변환 시 날아갈 수 있으니 검은색으로 통일."
+                ></textarea>
+              </label>
+
+              <div class="actions">
+                <button id="draftKnowledgeButton" class="primary-button" type="button">구조화 초안 생성</button>
+                <button id="saveKnowledgeButton" class="ghost-button" type="button">확정 저장</button>
+                <p id="knowledgeStatusText" class="status-text">저장된 지식을 불러오는 중입니다.</p>
+              </div>
+
+              <section class="response-panel">
+                <div class="response-header">
+                  <h2>구조화 초안</h2>
+                  <button id="copyKnowledgeDraftButton" class="ghost-button" type="button">복사</button>
+                </div>
+                <textarea id="knowledgeDraftOutput" class="json-editor" rows="14">[]</textarea>
+                <p class="helper-text">
+                  필요한 경우 JSON을 직접 수정한 뒤 확정 저장할 수 있습니다.
+                </p>
+              </section>
+
+              <section class="knowledge-dashboard">
+                <div class="response-header">
+                  <h2>저장된 지식 카드</h2>
+                  <div id="knowledgeStats" class="status-text">아직 통계가 없습니다.</div>
+                </div>
+                <div id="knowledgeCardList" class="knowledge-card-list"></div>
+              </section>
+            </section>
+          </section>
         </section>
 
         <aside class="nav-panel" aria-label="업무공간 내비게이션">
@@ -340,6 +405,7 @@
           <button class="nav-button" type="button" data-target-view="documents">문서 처리</button>
           <button class="nav-button" type="button" data-target-view="proposal-ops">제안 운영</button>
           <button class="nav-button" type="button" data-target-view="announcement-agent">공고 에이전트</button>
+          <button class="nav-button" type="button" data-target-view="knowledge">지식 메모</button>
         </aside>
       </div>
     </main>

@@ -37,6 +37,7 @@ Completed:
 - 공고 에이전트 now requires a PDF notice file identified by `공고` in the file name or extracted text, and uses that PDF as the structured-analysis source
 - 공고 에이전트 skips parsing non-notice attachments such as HWP/Excel/PPT, saves them as original files, and records their file metadata in `첨부파일목록.json`
 - Proposal folder-tree creation is intentionally deferred until the later proposal-drive stage after a proposal decision
+- 암묵지 지식 메모 MVP가 추가되어 자유 메모를 구조화 초안 카드로 나누고, 사용자가 검토 후 JSON 지식 저장소에 확정 저장할 수 있음
 
 ## Files Added For The Web MVP
 - `frontend/web/index.html`
@@ -113,6 +114,22 @@ RAG file split:
 - `src/openharness/services/rag_retrieval.py`
   - cosine similarity search and prompt-friendly context rendering
 
+### `src/openharness/services/tacit_knowledge.py`
+Contains the first JSON-backed tacit knowledge store:
+- preserves raw user memos
+- creates draft knowledge cards from memo segments
+- classifies cards by configurable keyword rules
+- saves confirmed lesson/rule/fact/inquiry cards
+- writes graph-shaped relation edges for later graph DB migration
+
+### `proposal_assets/config/knowledge_categories.json`
+Contains the first configurable tacit-knowledge taxonomy:
+- knowledge types
+- verification statuses
+- workflow stages
+- display surfaces
+- keyword-based draft classification rules
+
 ### `src/openharness/config/paths.py`
 Now also contains project-scoped RAG storage helpers:
 - `get_project_rag_dir(cwd)`
@@ -188,6 +205,7 @@ The current `/api/process-document` route extracts text, runs the announcement w
 The current `/api/chat` route retrieves relevant indexed chunks and prepends them to the runtime prompt when retrieval succeeds
 Embedding backend creation currently supports only OpenAI-compatible profiles
 If no embedding profile or credentials are available, RAG indexing/retrieval should fail clearly instead of silently falling back or pretending to work
+The current `/api/knowledge/*` routes provide raw memo storage, draft card generation, confirmed-card storage, and knowledge-card listing for the web UI
 
 
 ## RAG Embedding Requirement
@@ -237,6 +255,11 @@ src/openharness/services/rag_indexing.py
 src/openharness/services/rag_store.py
 src/openharness/services/rag_retrieval.py
 src/openharness/services/rag_embeddings.py
+Change tacit knowledge memo/card behavior
+Edit:
+
+src/openharness/services/tacit_knowledge.py
+proposal_assets/config/knowledge_categories.json
 Change model/profile definitions
 Edit:
 

@@ -1,7 +1,7 @@
 # Latest Handoff
 
 ## 우분투 서버 이전
-Updated: 2026-04-14 17:40 KST
+Updated: 2026-04-15 KST
 
 ## GitHub
 
@@ -209,3 +209,36 @@ Key decision:
 - Do not convert every source file to PDF as the sole ingestion path.
 - Preserve originals, normalize narrative documents to Markdown, normalize structured data such as Excel to JSON tables, keep page/slide/sheet anchors, and store graph-ready relations.
 - Use JSON cards and `relations.json` first, with a later migration path to an embedded graph DB if relation queries become central.
+
+## Latest Implemented Slice: Tacit Knowledge Memo MVP
+
+Implemented:
+
+- Configurable tacit knowledge taxonomy: `proposal_assets/config/knowledge_categories.json`.
+- JSON-backed tacit knowledge service: `src/openharness/services/tacit_knowledge.py`.
+- Web API:
+  - `GET /api/knowledge/state`
+  - `POST /api/knowledge/draft`
+  - `POST /api/knowledge/save`
+- Web UI tab: `지식 메모`.
+- UI flow:
+  - user enters a free memo plus optional business/ministry/agency/case metadata.
+  - system creates structured draft cards.
+  - user reviews or edits JSON.
+  - user confirms and saves cards.
+  - saved cards appear in the knowledge card list.
+
+Current implementation detail:
+
+- Draft structuring is keyword-rule based, not yet LLM-based.
+- This is intentional for the first slice: the storage, review, confirmation, and relation shape must stabilize first.
+- Later, the same `/api/knowledge/draft` endpoint can call the selected model to create richer draft cards.
+
+Verification:
+
+- `python -m py_compile scripts/web_mvp_server.py src/openharness/services/tacit_knowledge.py`
+- `python -m pytest tests/test_services/test_tacit_knowledge.py`
+
+Known verification gap:
+
+- JS syntax check was not run because `node` is not available on the current shell `PATH`.

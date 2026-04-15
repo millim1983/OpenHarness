@@ -26,6 +26,11 @@ from openharness.services.rag_metadata import build_rag_document_metadata
 from openharness.services.rag_retrieval import build_retrieval_context, retrieve_relevant_chunks
 from openharness.services.rag_store import RagStore
 from openharness.services.rag_types import ChunkRecord, RagRetrievalFilters
+from openharness.services.tacit_knowledge import (
+    KnowledgeStore,
+    create_knowledge_draft,
+    save_knowledge_cards,
+)
 from openharness.services.web_runtime import run_single_prompt_sync
 from openharness.services.workflows import (
     AnnouncementAgentRequest,
@@ -647,6 +652,26 @@ def _list_rag_documents() -> dict[str, Any]:
     }
 
 
+def _knowledge_state() -> dict[str, Any]:
+    return KnowledgeStore.for_project(REPO_ROOT).state()
+
+
+def _create_knowledge_draft(payload: dict[str, Any]) -> dict[str, Any]:
+    memo = str(payload.get("memo", "")).strip()
+    if not memo:
+        raise ValueError("`memo` is required.")
+    metadata = payload.get("metadata") if isinstance(payload.get("metadata"), dict) else {}
+    return create_knowledge_draft(cwd=REPO_ROOT, memo=memo, metadata=metadata)
+
+
+def _save_knowledge_cards(payload: dict[str, Any]) -> dict[str, Any]:
+    cards = payload.get("cards", [])
+    if not isinstance(cards, list) or not cards:
+        raise ValueError("`cards` must be a non-empty list.")
+    confirm = bool(payload.get("confirm", True))
+    return save_knowledge_cards(cwd=REPO_ROOT, cards=cards, confirm=confirm)
+
+
 def _ingestion_source_payload(source: Any) -> dict[str, Any]:
     return {
         "id": source.id,
@@ -835,6 +860,9 @@ class WebMvpHandler(SimpleHTTPRequestHandler):
         if parsed_path.path == "/api/ingestion/state":
             self._send_json(HTTPStatus.OK, _ingestion_state())
             return
+        if parsed_path.path == "/api/knowledge/state":
+            self._send_json(HTTPStatus.OK, _knowledge_state())
+            return
         if parsed_path.path == "/api/ingestion/sources":
             self._send_json(HTTPStatus.OK, {"sources": _ingestion_state()["sources"]})
             return
@@ -887,6 +915,12 @@ class WebMvpHandler(SimpleHTTPRequestHandler):
             return
         if self.path == "/api/ingestion/review":
             self._handle_ingestion_review_request()
+            return
+        if self.path == "/api/knowledge/draft":
+            self._handle_knowledge_draft_request()
+            return
+        if self.path == "/api/knowledge/save":
+            self._handle_knowledge_save_request()
             return
 
         self._send_json(HTTPStatus.NOT_FOUND, {"error": "Unknown endpoint"})
@@ -1072,6 +1106,38 @@ class WebMvpHandler(SimpleHTTPRequestHandler):
 
         try:
             result = _update_ingestion_review_item(payload)
+        except ValueError as exc:
+            self._send_json(HTTPStatus.BAD_REQUEST, {"error": str(exc)})
+            return
+        except Exception as exc:  # pragma: no cover - defensive endpoint guard
+            self._send_json(HTTPStatus.INTERNAL_SERVER_ERROR, {"error": str(exc)})
+            return
+
+        self._send_json(HTTPStatus.OK, result)
+
+    def _handle_knowledge_draft_request(self) -> None:
+        payload = self._read_json_body()
+        if payload is None:
+            return
+
+        try:
+            result = _create_knowledge_draft(payload)
+        except ValueError as exc:
+            self._send_json(HTTPStatus.BAD_REQUEST, {"error": str(exc)})
+            return
+        except Exception as exc:  # pragma: no cover - defensive endpoint guard
+            self._send_json(HTTPStatus.INTERNAL_SERVER_ERROR, {"error": str(exc)})
+            return
+
+        self._send_json(HTTPStatus.OK, result)
+
+    def _handle_knowledge_save_request(self) -> None:
+        payload = self._read_json_body()
+        if payload is None:
+            return
+
+        try:
+            result = _save_knowledge_cards(payload)
         except ValueError as exc:
             self._send_json(HTTPStatus.BAD_REQUEST, {"error": str(exc)})
             return

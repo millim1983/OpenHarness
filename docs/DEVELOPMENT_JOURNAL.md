@@ -96,3 +96,11 @@
 - 핵심은 원문 메모를 보존하되 에이전트가 `언제 꺼낼지`, `어떤 사업/부처/단계에 적용되는지`, `체크리스트인지 문의항목인지 규정근거인지`를 구조화해서 저장하는 것이다.
 - `docs/INGESTION_PIPELINE_PLAN.md`에 HWP, PDF, Word, PPT, Excel 등 혼합 문서 처리 방향을 추가했다.
 - 문서 처리는 모든 파일을 PDF로 변환하는 방식이 아니라 원본 보존, Markdown 정규화, Excel/표 JSON화, page/slide/sheet anchor 보존, VectorDB/RAG 및 지식카드 추출로 연결하는 방식으로 잡았다.
+
+### 암묵지 지식 메모 MVP 구현
+- `proposal_assets/config/knowledge_categories.json`을 추가해 지식 유형, 검증 상태, 업무 단계, 표출 방식, 키워드 기반 초안 분류 규칙을 코드 밖 설정으로 분리했다.
+- `src/openharness/services/tacit_knowledge.py`를 추가해 원문 메모 저장, 구조화 초안 카드 생성, 확정 저장, relation edge 생성을 JSON 파일 기반으로 구현했다.
+- 웹 API `/api/knowledge/state`, `/api/knowledge/draft`, `/api/knowledge/save`를 추가했다.
+- 웹 UI에 `지식 메모` 탭을 추가해 자유 메모 입력, 사업/부처/기관/케이스 메타데이터 입력, 구조화 초안 미리보기, JSON 수정 후 확정 저장, 저장된 지식 카드 목록 표시를 지원한다.
+- 첫 구현은 LLM 호출 없이 키워드 규칙 기반으로 동작한다. 저장/검토/확정 데이터 구조를 먼저 안정화한 뒤 같은 API 뒤에 모델 기반 구조화기를 붙일 계획이다.
+- `tests/test_services/test_tacit_knowledge.py`를 추가했고 2개 테스트 통과를 확인했다.

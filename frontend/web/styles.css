@@ -578,6 +578,91 @@ textarea {
   margin-top: 0;
 }
 
+.knowledge-panel {
+  padding: 18px;
+  border-radius: var(--radius);
+  background: var(--surface);
+  border: 1px solid var(--line);
+  box-shadow: var(--shadow);
+}
+
+.knowledge-form-grid {
+  display: grid;
+  gap: 12px;
+  grid-template-columns: repeat(auto-fit, minmax(190px, 1fr));
+  margin: 16px 0;
+}
+
+.json-editor {
+  width: 100%;
+  min-height: 340px;
+  font-family: ui-monospace, SFMono-Regular, "SF Mono", Consolas, "Liberation Mono", monospace;
+  font-size: 0.86rem;
+}
+
+.knowledge-dashboard {
+  margin-top: 16px;
+  padding: 18px;
+  border-radius: var(--radius);
+  background: var(--surface);
+  border: 1px solid var(--line);
+  box-shadow: var(--shadow);
+}
+
+.knowledge-card-list {
+  display: grid;
+  gap: 10px;
+  margin-top: 12px;
+}
+
+.knowledge-card-item {
+  padding: 12px;
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  background: var(--surface-subtle);
+}
+
+.knowledge-card-header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 10px;
+}
+
+.knowledge-card-item h3,
+.knowledge-card-item p {
+  margin: 0;
+}
+
+.knowledge-card-item h3 {
+  font-size: 0.98rem;
+  line-height: 1.4;
+}
+
+.knowledge-card-item p {
+  margin-top: 8px;
+  color: var(--text);
+  font-size: 0.9rem;
+  line-height: 1.5;
+}
+
+.knowledge-card-meta {
+  color: var(--muted) !important;
+  font-size: 0.82rem !important;
+}
+
+.knowledge-badge {
+  flex-shrink: 0;
+  display: inline-block;
+  padding: 3px 8px;
+  border-radius: var(--radius);
+  background: #e8f5e9;
+  color: #256029;
+  font-size: 0.72rem;
+  font-weight: 700;
+  white-space: nowrap;
+}
+
 .rag-stats,
 .rag-db-path,
 .ingestion-stats {
@@ -715,8 +800,10 @@ pre {
   .document-results,
   .announcement-results,
   .rag-filter-grid,
+  .knowledge-form-grid,
   .rag-document-item,
-  .ingestion-review-item {
+  .ingestion-review-item,
+  .knowledge-card-header {
     align-items: flex-start;
     flex-direction: column;
   }
@@ -732,6 +819,10 @@ pre {
   }
 
   .rag-filter-grid {
+    display: flex;
+  }
+
+  .knowledge-form-grid {
     display: flex;
   }
 

@@ -46,6 +46,19 @@ const announcementAgentOutput = document.querySelector("#announcementAgentOutput
 const announcementDashboardOutput = document.querySelector("#announcementDashboardOutput");
 const announcementFeedbackInput = document.querySelector("#announcementFeedbackInput");
 const saveAnnouncementFeedbackButton = document.querySelector("#saveAnnouncementFeedbackButton");
+const knowledgeBusinessDomainInput = document.querySelector("#knowledgeBusinessDomainInput");
+const knowledgeMinistryInput = document.querySelector("#knowledgeMinistryInput");
+const knowledgeAgencyInput = document.querySelector("#knowledgeAgencyInput");
+const knowledgeBusinessTypeInput = document.querySelector("#knowledgeBusinessTypeInput");
+const knowledgeMemoInput = document.querySelector("#knowledgeMemoInput");
+const draftKnowledgeButton = document.querySelector("#draftKnowledgeButton");
+const saveKnowledgeButton = document.querySelector("#saveKnowledgeButton");
+const refreshKnowledgeButton = document.querySelector("#refreshKnowledgeButton");
+const copyKnowledgeDraftButton = document.querySelector("#copyKnowledgeDraftButton");
+const knowledgeDraftOutput = document.querySelector("#knowledgeDraftOutput");
+const knowledgeStatusText = document.querySelector("#knowledgeStatusText");
+const knowledgeStats = document.querySelector("#knowledgeStats");
+const knowledgeCardList = document.querySelector("#knowledgeCardList");
 let lastAnnouncementAgentPayload = null;
 
 async function loadProfiles() {
@@ -83,6 +96,9 @@ function setBusyState(isBusy) {
   refreshIngestionButton.disabled = isBusy;
   runAnnouncementAgentButton.disabled = isBusy;
   saveAnnouncementFeedbackButton.disabled = isBusy;
+  draftKnowledgeButton.disabled = isBusy;
+  saveKnowledgeButton.disabled = isBusy;
+  refreshKnowledgeButton.disabled = isBusy;
 }
 
 function switchView(viewName) {
@@ -94,6 +110,11 @@ function switchView(viewName) {
   }
   if (viewName === "documents") {
     void Promise.all([loadRagDocuments(), loadIngestionState()]).catch((error) => {
+      setStatus(String(error.message || error));
+    });
+  }
+  if (viewName === "knowledge") {
+    void loadKnowledgeState().catch((error) => {
       setStatus(String(error.message || error));
     });
   }
@@ -295,6 +316,140 @@ async function loadIngestionState() {
     throw new Error(payload.error || "수집 상태를 불러오지 못했습니다.");
   }
   renderIngestionState(payload);
+}
+
+function collectKnowledgeMetadata() {
+  return {
+    business_domain: knowledgeBusinessDomainInput.value.trim(),
+    ministry: knowledgeMinistryInput.value.trim(),
+    agency: knowledgeAgencyInput.value.trim(),
+    business_type: knowledgeBusinessTypeInput.value.trim(),
+    source_type: "human_experience",
+    source_name: "업무 메모",
+  };
+}
+
+function renderKnowledgeState(state) {
+  const cards = Array.isArray(state.cards) ? state.cards : [];
+  knowledgeStats.textContent = `원문 메모 ${state.raw_note_count || 0}개 | 지식 카드 ${state.card_count || 0}개`;
+  knowledgeCardList.innerHTML = "";
+  if (cards.length === 0) {
+    const empty = document.createElement("p");
+    empty.className = "helper-text";
+    empty.textContent = "아직 저장된 지식 카드가 없습니다.";
+    knowledgeCardList.appendChild(empty);
+    return;
+  }
+  for (const card of cards.slice(0, 30)) {
+    const article = document.createElement("article");
+    article.className = "knowledge-card-item";
+    const header = document.createElement("div");
+    header.className = "knowledge-card-header";
+    const title = document.createElement("h3");
+    title.textContent = card.title || card.id || "제목 없는 지식";
+    const badge = document.createElement("span");
+    badge.className = "knowledge-badge";
+    badge.textContent = formatKnowledgeType(card.knowledge_type);
+    header.appendChild(title);
+    header.appendChild(badge);
+
+    const content = document.createElement("p");
+    content.textContent = card.display?.message || card.recommended_action || card.content || "";
+    const meta = document.createElement("p");
+    meta.className = "knowledge-card-meta";
+    meta.textContent = [
+      Array.isArray(card.workflow_stage) && card.workflow_stage.length ? `단계 ${card.workflow_stage.join(", ")}` : "",
+      Array.isArray(card.category) && card.category.length ? `분류 ${card.category.join(", ")}` : "",
+      Array.isArray(card.business_domain) && card.business_domain.length ? `사업 ${card.business_domain.join(", ")}` : "",
+      Array.isArray(card.ministry) && card.ministry.length ? `부처 ${card.ministry.join(", ")}` : "",
+      Array.isArray(card.agency) && card.agency.length ? `기관 ${card.agency.join(", ")}` : "",
+      card.verification?.status ? `상태 ${formatKnowledgeStatus(card.verification.status)}` : "",
+    ]
+      .filter(Boolean)
+      .join(" | ");
+    article.appendChild(header);
+    article.appendChild(content);
+    article.appendChild(meta);
+    knowledgeCardList.appendChild(article);
+  }
+}
+
+async function loadKnowledgeState() {
+  const response = await fetch("/api/knowledge/state");
+  const payload = await response.json();
+  if (!response.ok) {
+    throw new Error(payload.error || "지식 상태를 불러오지 못했습니다.");
+  }
+  renderKnowledgeState(payload);
+  knowledgeStatusText.textContent = payload.store_path ? `저장소: ${payload.store_path}` : "지식 상태를 불러왔습니다.";
+}
+
+async function draftKnowledgeMemo() {
+  const memo = knowledgeMemoInput.value.trim();
+  if (!memo) {
+    knowledgeStatusText.textContent = "먼저 메모를 입력하세요.";
+    knowledgeMemoInput.focus();
+    return;
+  }
+  setBusyState(true);
+  knowledgeStatusText.textContent = "구조화 초안 생성 중...";
+  try {
+    const response = await fetch("/api/knowledge/draft", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        memo,
+        metadata: collectKnowledgeMetadata(),
+      }),
+    });
+    const payload = await response.json();
+    if (!response.ok) {
+      throw new Error(payload.error || "지식 초안 생성에 실패했습니다.");
+    }
+    knowledgeDraftOutput.value = JSON.stringify(payload.draft_cards || [], null, 2);
+    renderKnowledgeState(payload.state || {});
+    knowledgeStatusText.textContent = `초안 ${(payload.draft_cards || []).length}개를 생성했습니다. 검토 후 확정 저장하세요.`;
+  } catch (error) {
+    knowledgeStatusText.textContent = String(error.message || error);
+  } finally {
+    setBusyState(false);
+  }
+}
+
+async function saveKnowledgeDraft() {
+  let cards;
+  try {
+    cards = JSON.parse(knowledgeDraftOutput.value || "[]");
+  } catch (error) {
+    knowledgeStatusText.textContent = `초안 JSON을 해석하지 못했습니다: ${error.message || error}`;
+    return;
+  }
+  if (!Array.isArray(cards) || cards.length === 0) {
+    knowledgeStatusText.textContent = "저장할 지식 카드 초안이 없습니다.";
+    return;
+  }
+  setBusyState(true);
+  knowledgeStatusText.textContent = "지식 카드 저장 중...";
+  try {
+    const response = await fetch("/api/knowledge/save", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        cards,
+        confirm: true,
+      }),
+    });
+    const payload = await response.json();
+    if (!response.ok) {
+      throw new Error(payload.error || "지식 카드 저장에 실패했습니다.");
+    }
+    renderKnowledgeState(payload.state || {});
+    knowledgeStatusText.textContent = `지식 카드 ${(payload.saved_cards || []).length}개를 확정 저장했습니다.`;
+  } catch (error) {
+    knowledgeStatusText.textContent = String(error.message || error);
+  } finally {
+    setBusyState(false);
+  }
 }
 
 async function updateIngestionReviewStatus(reviewItemId, reviewStatus) {
@@ -682,6 +837,32 @@ function formatReviewStatus(status) {
     needs_review: "검수 필요",
     failed: "실패",
     stale: "오래됨",
+  };
+  return labels[status] || status || "미확인";
+}
+
+function formatKnowledgeType(type) {
+  const labels = {
+    lesson: "암묵지",
+    domain_rule: "도메인 규칙",
+    announcement_fact: "공고 사실",
+    submission_warning: "제출 주의",
+    strategy_hint: "전략 힌트",
+    inquiry_item: "문의 항목",
+    correction: "교정",
+  };
+  return labels[type] || type || "미분류";
+}
+
+function formatKnowledgeStatus(status) {
+  const labels = {
+    unreviewed: "검토 전",
+    confirmed: "확정",
+    rejected: "반려",
+    needs_inquiry: "문의 필요",
+    needs_recheck: "재검토 필요",
+    expired: "만료",
+    needs_evidence: "근거 필요",
   };
   return labels[status] || status || "미확인";
 }
@@ -1298,6 +1479,15 @@ refreshIngestionButton.addEventListener("click", async () => {
   }
 });
 
+refreshKnowledgeButton.addEventListener("click", async () => {
+  try {
+    await loadKnowledgeState();
+    setStatus("지식 카드를 새로고침했습니다.");
+  } catch (error) {
+    setStatus(String(error.message || error));
+  }
+});
+
 ingestionReviewList.addEventListener("click", (event) => {
   const button = event.target.closest("button[data-review-item-id]");
   if (!button) {
@@ -1368,6 +1558,14 @@ saveProjectContextButton.addEventListener("click", () => {
   void saveProjectContext();
 });
 
+draftKnowledgeButton.addEventListener("click", () => {
+  void draftKnowledgeMemo();
+});
+
+saveKnowledgeButton.addEventListener("click", () => {
+  void saveKnowledgeDraft();
+});
+
 documentInput.addEventListener("change", () => {
   handleDocumentSelection();
 });
@@ -1409,6 +1607,10 @@ copyAnnouncementAgentButton.addEventListener("click", () => {
   );
 });
 
+copyKnowledgeDraftButton.addEventListener("click", () => {
+  void copyText(knowledgeDraftOutput.value, "[]", "구조화 초안을 복사했습니다.");
+});
+
 messageInput.addEventListener("keydown", (event) => {
   if ((event.ctrlKey || event.metaKey) && event.key === "Enter") {
     event.preventDefault();
@@ -1416,6 +1618,12 @@ messageInput.addEventListener("keydown", (event) => {
   }
 });
 
-void Promise.all([loadProfiles(), loadProjectContext(), loadRagDocuments(), loadIngestionState()]).catch((error) => {
+void Promise.all([
+  loadProfiles(),
+  loadProjectContext(),
+  loadRagDocuments(),
+  loadIngestionState(),
+  loadKnowledgeState(),
+]).catch((error) => {
   setStatus(String(error.message || error));
 });

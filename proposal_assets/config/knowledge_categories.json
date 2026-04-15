@@ -1,0 +1,104 @@
+{
+  "schema_version": 1,
+  "knowledge_types": [
+    "lesson",
+    "domain_rule",
+    "announcement_fact",
+    "submission_warning",
+    "strategy_hint",
+    "inquiry_item",
+    "correction"
+  ],
+  "verification_statuses": [
+    "unreviewed",
+    "confirmed",
+    "rejected",
+    "needs_inquiry",
+    "needs_recheck",
+    "expired",
+    "needs_evidence"
+  ],
+  "workflow_stages": [
+    "announcement_review",
+    "rfp_review",
+    "proposal_planning",
+    "proposal_writing",
+    "consortium_planning",
+    "budget_planning",
+    "submission_document_preparation",
+    "pre_submission_review",
+    "post_project_retrospective"
+  ],
+  "display_surfaces": [
+    "checklist",
+    "inquiry_item",
+    "warning",
+    "writing_guidance",
+    "risk"
+  ],
+  "keyword_rules": [
+    {
+      "name": "submission_copy_black_and_white",
+      "keywords": ["부본", "흑백", "제출서류", "인쇄본"],
+      "knowledge_type": "submission_warning",
+      "category": ["제출주의사항"],
+      "workflow_stage": ["rfp_review", "pre_submission_review"],
+      "surface_as": "checklist",
+      "priority": "high"
+    },
+    {
+      "name": "hwp_pdf_color_warning",
+      "keywords": ["한글", "HWP", "pdf", "PDF", "회색", "글씨색", "검은색"],
+      "knowledge_type": "submission_warning",
+      "category": ["문서제작", "PDF변환"],
+      "workflow_stage": ["submission_document_preparation", "pre_submission_review"],
+      "surface_as": "warning",
+      "priority": "high"
+    },
+    {
+      "name": "proposal_story_quality",
+      "keywords": ["현황", "배경", "필요성", "시나리오", "페르소나", "사용자"],
+      "knowledge_type": "strategy_hint",
+      "category": ["제안서품질", "배경필요성", "사용자시나리오"],
+      "workflow_stage": ["rfp_review", "proposal_planning", "proposal_writing"],
+      "surface_as": "writing_guidance",
+      "priority": "medium"
+    },
+    {
+      "name": "system_architecture_quality",
+      "keywords": ["HW", "SW", "구성도", "기능구성도", "목표시스템", "아키텍처"],
+      "knowledge_type": "strategy_hint",
+      "category": ["기술구성", "시스템구성도"],
+      "workflow_stage": ["proposal_planning", "proposal_writing"],
+      "surface_as": "checklist",
+      "priority": "medium"
+    },
+    {
+      "name": "demand_org_budget_rule",
+      "keywords": ["수요기관", "수요기업", "민간부담금", "연구비", "현금", "공동연구기관"],
+      "knowledge_type": "domain_rule",
+      "category": ["수요기관", "민간부담금", "연구비", "컨소시엄"],
+      "workflow_stage": ["announcement_review", "rfp_review", "consortium_planning", "budget_planning"],
+      "surface_as": "inquiry_item",
+      "priority": "high"
+    },
+    {
+      "name": "subcontract_or_entrusted_org",
+      "keywords": ["위탁", "중견기업", "대기업", "중기부", "중소벤처기업부"],
+      "knowledge_type": "domain_rule",
+      "category": ["위탁", "참여자격", "컨소시엄"],
+      "workflow_stage": ["announcement_review", "consortium_planning"],
+      "surface_as": "inquiry_item",
+      "priority": "high"
+    },
+    {
+      "name": "commitment_letter",
+      "keywords": ["참여 확약서", "참여확약서", "업무 협의서", "업무협의서", "참여의지"],
+      "knowledge_type": "strategy_hint",
+      "category": ["수요기관", "제출서류", "컨소시엄강점"],
+      "workflow_stage": ["proposal_planning", "submission_document_preparation"],
+      "surface_as": "checklist",
+      "priority": "medium"
+    }
+  ]
+}
