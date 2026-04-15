@@ -258,6 +258,7 @@ Implemented:
 - Proposal Ops merges matched checklist/warning/writing-guidance cards into `submission_checklist`.
 - Proposal Ops merges matched inquiry cards into `manager_questions`.
 - Web structured-analysis output now renders a `지식 기반 체크리스트/문의항목` section.
+- Web document-processing output now also has a dedicated `지식 기반 체크리스트` card panel with per-item check toggles.
 
 Verification:
 

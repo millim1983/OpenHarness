@@ -59,6 +59,9 @@ const knowledgeDraftOutput = document.querySelector("#knowledgeDraftOutput");
 const knowledgeStatusText = document.querySelector("#knowledgeStatusText");
 const knowledgeStats = document.querySelector("#knowledgeStats");
 const knowledgeCardList = document.querySelector("#knowledgeCardList");
+const knowledgeMatchPanel = document.querySelector("#knowledgeMatchPanel");
+const knowledgeMatchStats = document.querySelector("#knowledgeMatchStats");
+const knowledgeMatchList = document.querySelector("#knowledgeMatchList");
 let lastAnnouncementAgentPayload = null;
 
 async function loadProfiles() {
@@ -559,6 +562,7 @@ function renderDocumentDetail(payload) {
     structured && Object.keys(structured).length > 0
       ? formatExecutionPlan(structured)
       : "(저장된 내부 실행계획 없음)";
+  renderKnowledgeMatches(structured.knowledge_matches);
 }
 
 async function runRagDocumentAction(action, documentId) {
@@ -865,6 +869,78 @@ function formatKnowledgeStatus(status) {
     needs_evidence: "근거 필요",
   };
   return labels[status] || status || "미확인";
+}
+
+function renderKnowledgeMatches(matches) {
+  if (!knowledgeMatchPanel || !knowledgeMatchStats || !knowledgeMatchList) {
+    return;
+  }
+  const total = matches && typeof matches === "object" ? Number(matches.matched_count || 0) : 0;
+  knowledgeMatchStats.textContent = total ? `${total}개 매칭` : "아직 매칭된 지식이 없습니다.";
+  knowledgeMatchList.innerHTML = "";
+
+  if (!total) {
+    const empty = document.createElement("p");
+    empty.className = "helper-text";
+    empty.textContent = "공고/RFP 분석 결과와 일치하는 확정 지식 카드가 아직 없습니다.";
+    knowledgeMatchList.appendChild(empty);
+    return;
+  }
+
+  const groups = [
+    ["문의 필요", matches.inquiry_items, "inquiry"],
+    ["체크리스트", matches.checklist, "checklist"],
+    ["주의사항", matches.warnings, "warning"],
+    ["작성 가이드", matches.writing_guidance, "guide"],
+  ];
+
+  for (const [label, items, kind] of groups) {
+    if (!Array.isArray(items) || items.length === 0) {
+      continue;
+    }
+    for (const item of items) {
+      const card = document.createElement("article");
+      card.className = `knowledge-match-item ${kind}`;
+
+      const check = document.createElement("button");
+      check.className = "knowledge-match-check";
+      check.type = "button";
+      check.setAttribute("aria-label", "확인 표시");
+      check.addEventListener("click", () => {
+        check.classList.toggle("done");
+      });
+
+      const body = document.createElement("div");
+      const header = document.createElement("div");
+      header.className = "knowledge-card-header";
+      const title = document.createElement("h3");
+      title.textContent = item.title || item.knowledge_id || "지식 카드";
+      const badge = document.createElement("span");
+      badge.className = "knowledge-badge";
+      badge.textContent = label;
+      header.appendChild(title);
+      header.appendChild(badge);
+
+      const message = document.createElement("p");
+      message.textContent = item.message || "";
+      const meta = document.createElement("p");
+      meta.className = "knowledge-card-meta";
+      meta.textContent = [
+        item.priority ? `우선순위 ${item.priority}` : "",
+        item.knowledge_id ? `지식 ${item.knowledge_id}` : "",
+        item.reason ? `근거 ${item.reason}` : "",
+      ]
+        .filter(Boolean)
+        .join(" | ");
+
+      body.appendChild(header);
+      body.appendChild(message);
+      body.appendChild(meta);
+      card.appendChild(check);
+      card.appendChild(body);
+      knowledgeMatchList.appendChild(card);
+    }
+  }
 }
 
 function formatDocumentType(documentType) {
@@ -1323,6 +1399,7 @@ async function processDocument() {
     documentSummaryOutput.textContent = payload.summary || "(빈 요약)";
     documentStructuredOutput.textContent = formatStructuredInsights(payload.structured);
     documentExecutionOutput.textContent = formatExecutionPlan(payload.structured);
+    renderKnowledgeMatches(payload.structured?.knowledge_matches);
     renderProposalOpsDashboard(payload.proposal_ops);
     announcementAgentMeta.textContent = formatAnnouncementAgentMeta(payload.announcement_agent);
     announcementAgentMeta.style.display = payload.announcement_agent?.enabled ? "block" : "none";
@@ -1336,6 +1413,7 @@ async function processDocument() {
     documentSummaryOutput.textContent = message;
     documentStructuredOutput.textContent = message;
     documentExecutionOutput.textContent = message;
+    renderKnowledgeMatches(null);
     setStatus("문서 요청에 실패했습니다.");
   } finally {
     setBusyState(false);
@@ -1405,6 +1483,7 @@ async function runAnnouncementAgentBundle() {
     if (payload.structured) {
       documentStructuredOutput.textContent = formatStructuredInsights(payload.structured);
       documentExecutionOutput.textContent = formatExecutionPlan(payload.structured);
+      renderKnowledgeMatches(payload.structured.knowledge_matches);
     }
     documentSummaryOutput.textContent = payload.summary || documentSummaryOutput.textContent;
     if (payload.rag) {
@@ -1417,6 +1496,7 @@ async function runAnnouncementAgentBundle() {
     announcementFolderMeta.textContent = "공고 에이전트 실행 실패.";
     announcementAgentOutput.textContent = message;
     announcementDashboardOutput.textContent = message;
+    renderKnowledgeMatches(null);
     setStatus("공고 에이전트 요청 실패.");
   } finally {
     setBusyState(false);
@@ -1469,6 +1549,7 @@ function handleDocumentSelection() {
   }
 
   documentMeta.textContent = `선택한 파일: ${file.name}`;
+  renderKnowledgeMatches(null);
   documentExtractOutput.textContent = "아직 추출 텍스트가 없습니다.";
   documentSummaryOutput.textContent = "아직 요약이 없습니다.";
   documentStructuredOutput.textContent = "아직 구조화 분석 결과가 없습니다.";

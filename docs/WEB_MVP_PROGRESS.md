@@ -39,6 +39,7 @@ Completed:
 - Proposal folder-tree creation is intentionally deferred until the later proposal-drive stage after a proposal decision
 - 암묵지 지식 메모 MVP가 추가되어 자유 메모를 구조화 초안 카드로 나누고, 사용자가 검토 후 JSON 지식 저장소에 확정 저장할 수 있음
 - 저장된 지식 카드가 공고/RFP 분석 결과의 `knowledge_matches`로 매칭되어 체크리스트, 문의항목, 주의사항, 작성가이드로 표출될 수 있음
+- 문서 처리 화면에 `지식 기반 체크리스트` 패널이 추가되어 매칭된 지식 카드를 별도 카드형 체크 항목으로 확인할 수 있음
 
 ## Files Added For The Web MVP
 - `frontend/web/index.html`
