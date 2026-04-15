@@ -1005,6 +1005,7 @@ function formatStructuredInsights(structured) {
   const channel = structured.submission_channel || {};
   const contacts = Array.isArray(structured.contacts) ? structured.contacts : [];
   const risks = structured.risks_and_checks || {};
+  const knowledgeMatches = structured.knowledge_matches || {};
   const lines = [];
 
   if (overview.title) {
@@ -1201,7 +1202,37 @@ function formatStructuredInsights(structured) {
     }
   }
 
+  appendKnowledgeMatches(lines, knowledgeMatches);
+
   return lines.join("\n").trim() || "아직 구조화 분석 결과가 없습니다.";
+}
+
+function appendKnowledgeMatches(lines, matches) {
+  if (!matches || typeof matches !== "object" || !matches.matched_count) {
+    return;
+  }
+  lines.push("");
+  lines.push(`지식 기반 체크리스트/문의항목: ${matches.matched_count}개`);
+  appendKnowledgeMatchGroup(lines, "체크리스트", matches.checklist);
+  appendKnowledgeMatchGroup(lines, "문의 필요", matches.inquiry_items);
+  appendKnowledgeMatchGroup(lines, "주의사항", matches.warnings);
+  appendKnowledgeMatchGroup(lines, "작성 가이드", matches.writing_guidance);
+}
+
+function appendKnowledgeMatchGroup(lines, title, items) {
+  if (!Array.isArray(items) || items.length === 0) {
+    return;
+  }
+  lines.push("");
+  lines.push(title + ":");
+  for (const item of items) {
+    const priority = item.priority ? ` [${item.priority}]` : "";
+    const label = item.title || item.knowledge_id || "지식 카드";
+    lines.push(`- ${label}${priority}: ${item.message || ""}`);
+    if (item.reason) {
+      lines.push(`  근거: ${item.reason}`);
+    }
+  }
 }
 
 function formatExecutionPlan(structured) {

@@ -242,3 +242,24 @@ Verification:
 Known verification gap:
 
 - JS syntax check was not run because `node` is not available on the current shell `PATH`.
+
+## Latest Implemented Slice: Knowledge Matches In Analysis
+
+Implemented:
+
+- `KnowledgeStore.find_matching_cards()` scores saved knowledge cards against announcement/RFP analysis.
+- Matching criteria include ministry, agency, business type/domain, workflow stage, trigger keywords, category, and verification status.
+- Web document analysis and announcement-agent analysis now attach matches under `structured.knowledge_matches`.
+- Match buckets:
+  - `checklist`
+  - `inquiry_items`
+  - `warnings`
+  - `writing_guidance`
+- Proposal Ops merges matched checklist/warning/writing-guidance cards into `submission_checklist`.
+- Proposal Ops merges matched inquiry cards into `manager_questions`.
+- Web structured-analysis output now renders a `지식 기반 체크리스트/문의항목` section.
+
+Verification:
+
+- `python -m py_compile scripts/web_mvp_server.py src/openharness/services/tacit_knowledge.py src/openharness/services/workflows/proposal_ops.py`
+- `python -m pytest tests/test_services/test_tacit_knowledge.py tests/test_services/test_proposal_ops_workflow.py tests/test_services/test_web_mvp_rag.py`

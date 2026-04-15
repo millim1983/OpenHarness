@@ -38,6 +38,7 @@ Completed:
 - 공고 에이전트 skips parsing non-notice attachments such as HWP/Excel/PPT, saves them as original files, and records their file metadata in `첨부파일목록.json`
 - Proposal folder-tree creation is intentionally deferred until the later proposal-drive stage after a proposal decision
 - 암묵지 지식 메모 MVP가 추가되어 자유 메모를 구조화 초안 카드로 나누고, 사용자가 검토 후 JSON 지식 저장소에 확정 저장할 수 있음
+- 저장된 지식 카드가 공고/RFP 분석 결과의 `knowledge_matches`로 매칭되어 체크리스트, 문의항목, 주의사항, 작성가이드로 표출될 수 있음
 
 ## Files Added For The Web MVP
 - `frontend/web/index.html`
@@ -121,6 +122,7 @@ Contains the first JSON-backed tacit knowledge store:
 - classifies cards by configurable keyword rules
 - saves confirmed lesson/rule/fact/inquiry cards
 - writes graph-shaped relation edges for later graph DB migration
+- matches confirmed knowledge cards against announcement/RFP analysis output
 
 ### `proposal_assets/config/knowledge_categories.json`
 Contains the first configurable tacit-knowledge taxonomy:
@@ -206,6 +208,7 @@ The current `/api/chat` route retrieves relevant indexed chunks and prepends the
 Embedding backend creation currently supports only OpenAI-compatible profiles
 If no embedding profile or credentials are available, RAG indexing/retrieval should fail clearly instead of silently falling back or pretending to work
 The current `/api/knowledge/*` routes provide raw memo storage, draft card generation, confirmed-card storage, and knowledge-card listing for the web UI
+Announcement/RFP analysis now can attach `structured.knowledge_matches`, and Proposal Ops consumes those matches for checklist and inquiry items
 
 
 ## RAG Embedding Requirement

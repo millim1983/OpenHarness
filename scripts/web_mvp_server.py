@@ -29,6 +29,7 @@ from openharness.services.rag_types import ChunkRecord, RagRetrievalFilters
 from openharness.services.tacit_knowledge import (
     KnowledgeStore,
     create_knowledge_draft,
+    match_knowledge_for_analysis,
     save_knowledge_cards,
 )
 from openharness.services.web_runtime import run_single_prompt_sync
@@ -324,6 +325,19 @@ def _run_chat(
     return result
 
 
+def _structured_with_knowledge_matches(
+    structured: dict[str, Any], extracted_text: str, workflow_stage: str
+) -> dict[str, Any]:
+    payload = dict(structured)
+    payload["knowledge_matches"] = match_knowledge_for_analysis(
+        cwd=REPO_ROOT,
+        structured_analysis=payload,
+        extracted_text=extracted_text,
+        workflow_stage=workflow_stage,
+    )
+    return payload
+
+
 def _run_document_summary(
     profile_name: str,
     filename: str,
@@ -375,11 +389,16 @@ def _run_document_summary(
         ),
         cwd=str(REPO_ROOT),
     )
+    structured = _structured_with_knowledge_matches(
+        workflow_result.structured,
+        extracted_text,
+        "announcement_review",
+    )
     store.upsert_document_artifact(
         document_id,
         extracted_text=extracted_text,
         summary=workflow_result.summary,
-        structured=workflow_result.structured,
+        structured=structured,
         workflow_name=workflow_result.workflow_name,
         prompt_source_truncated=workflow_result.prompt_source_truncated,
     )
@@ -394,13 +413,13 @@ def _run_document_summary(
             instruction=instruction,
             has_team_context=bool(team_context.strip()),
             source_kind="web_mvp_upload",
-            structured_analysis=workflow_result.structured,
+            structured_analysis=structured,
         ),
     )
     proposal_ops = build_proposal_ops_preview(
         ProposalOpsRequest(
             file_name=filename,
-            structured_analysis=workflow_result.structured,
+            structured_analysis=structured,
             instruction=instruction,
             team_context=team_context,
         )
@@ -409,7 +428,7 @@ def _run_document_summary(
         AnnouncementAgentRequest(
             file_name=filename,
             file_bytes=file_bytes,
-            structured_analysis=workflow_result.structured,
+            structured_analysis=structured,
             instruction=instruction,
             team_context=team_context,
         )
@@ -421,7 +440,7 @@ def _run_document_summary(
         "extracted_char_count": len(extracted_text),
         "workflow": workflow_result.workflow_name,
         "summary": workflow_result.summary,
-        "structured": workflow_result.structured,
+        "structured": structured,
         "proposal_ops": proposal_ops,
         "announcement_agent": announcement_agent,
         "summary_source_truncated": workflow_result.prompt_source_truncated,
@@ -517,6 +536,11 @@ def _run_announcement_agent_bundle(
     structured = _structured_with_rag_metadata(
         workflow_result.structured,
         store.get_document_metadata(document_id),
+    )
+    structured = _structured_with_knowledge_matches(
+        structured,
+        notice_text,
+        "announcement_review",
     )
     store.upsert_document_artifact(
         document_id,

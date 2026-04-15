@@ -81,6 +81,68 @@ def _keyword_matches(text: str, keywords: list[str]) -> bool:
     return any(keyword.lower() in lowered for keyword in keywords)
 
 
+def _normalize(text: str) -> str:
+    return re.sub(r"\s+", "", text).lower()
+
+
+def _contains_match(text: str, value: str) -> bool:
+    normalized_text = _normalize(text)
+    normalized_value = _normalize(value)
+    return bool(normalized_value and normalized_value in normalized_text)
+
+
+def _structured_search_text(structured: dict[str, Any], extracted_text: str) -> str:
+    parts = [extracted_text]
+    for key in (
+        "metadata",
+        "announcement_overview",
+        "consortium_requirements",
+        "recommended_consortium_strategy",
+        "budget",
+        "risks_and_checks",
+        "submission_documents",
+    ):
+        value = structured.get(key)
+        if value:
+            parts.append(json.dumps(value, ensure_ascii=False))
+    return "\n".join(parts)
+
+
+def _metadata_values(structured: dict[str, Any]) -> dict[str, str]:
+    metadata = structured.get("metadata") if isinstance(structured.get("metadata"), dict) else {}
+    overview = (
+        structured.get("announcement_overview")
+        if isinstance(structured.get("announcement_overview"), dict)
+        else {}
+    )
+    return {
+        "ministry": str(metadata.get("ministry") or ""),
+        "agency": str(metadata.get("agency") or ""),
+        "business_type": str(metadata.get("business_type") or overview.get("project_type") or ""),
+        "business_domain": str(metadata.get("rd_or_non_rd") or overview.get("project_type") or ""),
+    }
+
+
+def _surface_bucket(surface: str) -> str:
+    return {
+        "checklist": "checklist",
+        "inquiry_item": "inquiry_items",
+        "warning": "warnings",
+        "writing_guidance": "writing_guidance",
+        "risk": "warnings",
+    }.get(surface, "checklist")
+
+
+def _match_status_allowed(card: dict[str, Any]) -> bool:
+    verification = card.get("verification") if isinstance(card.get("verification"), dict) else {}
+    return str(verification.get("status", "")) in {
+        "confirmed",
+        "needs_evidence",
+        "needs_inquiry",
+        "needs_recheck",
+    }
+
+
 def _default_rule() -> dict[str, Any]:
     return {
         "name": "general_lesson",
@@ -265,6 +327,103 @@ class KnowledgeStore:
             cards.extend(self._list_json_files(self.root_dir / directory_name))
         return sorted(cards, key=lambda item: str(item.get("lifecycle", {}).get("updated_at", "")), reverse=True)
 
+    def find_matching_cards(
+        self,
+        *,
+        structured_analysis: dict[str, Any],
+        extracted_text: str,
+        workflow_stage: str,
+        limit: int = 12,
+    ) -> dict[str, Any]:
+        search_text = _structured_search_text(structured_analysis, extracted_text)
+        metadata = _metadata_values(structured_analysis)
+        scored: list[tuple[int, dict[str, Any], list[str]]] = []
+
+        for card in self.list_cards():
+            if not _match_status_allowed(card):
+                continue
+            score = 0
+            reasons: list[str] = []
+            trigger = card.get("trigger") if isinstance(card.get("trigger"), dict) else {}
+
+            for field, weight in (
+                ("ministry", 3),
+                ("agency", 3),
+                ("business_type", 2),
+                ("business_domain", 2),
+            ):
+                values = _ensure_list(card.get(field))
+                target = metadata.get(field, "")
+                if target and any(_contains_match(target, value) or _contains_match(search_text, value) for value in values):
+                    score += weight
+                    reasons.append(f"{field} 일치")
+
+            stages = set(_ensure_list(card.get("workflow_stage"))) | set(
+                _ensure_list(trigger.get("when_to_show"))
+            )
+            if workflow_stage in stages:
+                score += 2
+                reasons.append(f"업무단계 {workflow_stage} 일치")
+
+            keyword_hits = [
+                keyword
+                for keyword in _ensure_list(trigger.get("keywords"))
+                if _contains_match(search_text, keyword)
+            ]
+            if keyword_hits:
+                score += len(keyword_hits)
+                reasons.append("키워드: " + ", ".join(keyword_hits[:5]))
+
+            categories = [
+                category
+                for category in _ensure_list(card.get("category"))
+                if _contains_match(search_text, category)
+            ]
+            if categories:
+                score += len(categories)
+                reasons.append("분류: " + ", ".join(categories[:3]))
+
+            verification = card.get("verification") if isinstance(card.get("verification"), dict) else {}
+            if verification.get("status") == "confirmed":
+                score += 2
+                reasons.append("확정 지식")
+
+            if score >= 3:
+                scored.append((score, card, reasons))
+
+        scored.sort(key=lambda item: item[0], reverse=True)
+        buckets: dict[str, list[dict[str, Any]]] = {
+            "checklist": [],
+            "inquiry_items": [],
+            "warnings": [],
+            "writing_guidance": [],
+        }
+        for score, card, reasons in scored[:limit]:
+            display = card.get("display") if isinstance(card.get("display"), dict) else {}
+            surface = str(display.get("surface_as") or "checklist")
+            bucket = _surface_bucket(surface)
+            buckets[bucket].append(
+                {
+                    "knowledge_id": str(card.get("id", "")),
+                    "title": str(card.get("title", "")),
+                    "message": str(display.get("message") or card.get("recommended_action") or card.get("content") or ""),
+                    "reason": "; ".join(reasons),
+                    "priority": str(display.get("priority") or "medium"),
+                    "knowledge_type": str(card.get("knowledge_type", "")),
+                    "verification_status": str(
+                        (card.get("verification") if isinstance(card.get("verification"), dict) else {}).get(
+                            "status", ""
+                        )
+                    ),
+                    "score": score,
+                }
+            )
+        return {
+            "workflow_stage": workflow_stage,
+            "matched_count": sum(len(items) for items in buckets.values()),
+            **buckets,
+        }
+
     def _list_json_files(self, directory: Path) -> list[dict[str, Any]]:
         return [
             payload
@@ -335,3 +494,19 @@ def save_knowledge_cards(
         "saved_cards": store.save_cards(cards, confirm=confirm),
         "state": store.state(),
     }
+
+
+def match_knowledge_for_analysis(
+    *,
+    cwd: str | Path,
+    structured_analysis: dict[str, Any],
+    extracted_text: str,
+    workflow_stage: str,
+    limit: int = 12,
+) -> dict[str, Any]:
+    return KnowledgeStore.for_project(cwd).find_matching_cards(
+        structured_analysis=structured_analysis,
+        extracted_text=extracted_text,
+        workflow_stage=workflow_stage,
+        limit=limit,
+    )

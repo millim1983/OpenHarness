@@ -110,6 +110,7 @@ def build_proposal_ops_preview(request: ProposalOpsRequest) -> dict[str, Any]:
     risks = _as_dict(structured.get("risks_and_checks"))
     internal_plan = _as_dict(structured.get("internal_execution_plan"))
     documents = _as_list(structured.get("submission_documents"))
+    knowledge_matches = _as_dict(structured.get("knowledge_matches"))
 
     title = str(overview.get("title") or request.file_name)
     deadline = str(schedule.get("submission_deadline") or schedule.get("end_at") or "")
@@ -117,7 +118,9 @@ def build_proposal_ops_preview(request: ProposalOpsRequest) -> dict[str, Any]:
     business_type = _guess_business_type(overview, structured)
     role_tasks = _build_role_tasks(internal_plan, request.team_context)
     submission_checklist = _build_submission_checklist(documents, channel, deadline)
+    submission_checklist.extend(_knowledge_checklist_items(knowledge_matches))
     manager_questions = _build_manager_questions(risks, channel, deadline)
+    manager_questions.extend(_knowledge_manager_questions(knowledge_matches))
 
     folder_template = _load_folder_template()
     folder_root = _build_folder_root(title, deadline, overview)
@@ -205,6 +208,45 @@ def _build_submission_checklist(
             "basis": "분석 결과에서 제출서류를 확정하지 못했습니다.",
         }
     ]
+
+
+def _knowledge_checklist_items(knowledge_matches: dict[str, Any]) -> list[dict[str, str]]:
+    items: list[dict[str, str]] = []
+    for key in ("checklist", "warnings", "writing_guidance"):
+        for match in _as_list(knowledge_matches.get(key)):
+            if not isinstance(match, dict):
+                continue
+            message = str(match.get("message") or match.get("title") or "").strip()
+            if not message:
+                continue
+            items.append(
+                {
+                    "item": message,
+                    "owner": "사업관리",
+                    "status": "needs_review",
+                    "basis": str(match.get("reason") or match.get("knowledge_id") or "knowledge_match"),
+                }
+            )
+    return items
+
+
+def _knowledge_manager_questions(knowledge_matches: dict[str, Any]) -> list[dict[str, str]]:
+    questions: list[dict[str, str]] = []
+    for match in _as_list(knowledge_matches.get("inquiry_items")):
+        if not isinstance(match, dict):
+            continue
+        message = str(match.get("message") or match.get("title") or "").strip()
+        if not message:
+            continue
+        questions.append(
+            {
+                "question": message,
+                "target": "전담기관 또는 내부 검토자",
+                "status": "open",
+                "reason": str(match.get("knowledge_id") or "knowledge_match"),
+            }
+        )
+    return questions
 
 
 def _build_manager_questions(
