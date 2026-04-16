@@ -118,3 +118,12 @@
 - 공고/RFP 분석 결과의 `structured.knowledge_matches`를 문의 필요, 체크리스트, 주의사항, 작성 가이드 카드로 분리해 렌더링한다.
 - 각 카드에는 지식 ID, 우선순위, 매칭 근거가 표시되고, 사용자가 화면에서 확인 표시를 토글할 수 있다.
 - 기존 구조화 분석 텍스트 안에 묻혀 있던 지식 매칭 결과를 별도 업무 체크 영역으로 분리해 실제 검토 흐름에서 쓰기 쉽게 했다.
+
+## 2026-04-17
+
+### 진짜 에이전트 전환 계획
+- 현재까지 만든 RAG, 공고 분석, 암묵지 지식카드, 제안 운영, 총괄장 생성은 에이전트가 사용할 도구로 재정의한다.
+- 다음 개발 목표는 단순 기능 추가가 아니라 `AnnouncementProposalAgent` 오케스트레이터를 도입하는 것이다.
+- `docs/ANNOUNCEMENT_PROPOSAL_AGENT_PLAN.md`를 추가해 Plan, Tool Use, Evidence, Decision, Assignment, Communication, Feedback을 기록하는 에이전트 표준을 명시했다.
+- 다음 접속 시 바로 시작할 일은 `src/openharness/services/workflows/announcement_proposal_agent.py` 생성, `AgentRun` 구조 추가, 실행/단계/판단 기록 저장소 구현, 기존 공고 에이전트 흐름을 최소 오케스트레이터로 감싸는 것이다.
+- GitHub 상태는 계획 수립 전 `HEAD = private/web-mvp-rag = origin/web-mvp-rag = 2c41eb4`로 확인했다.

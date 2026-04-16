@@ -1,14 +1,14 @@
 # Latest Handoff
 
 ## 우분투 서버 이전
-Updated: 2026-04-15 KST
+Updated: 2026-04-17 KST
 
 ## GitHub
 
 - Private remote: `https://github.com/millim1983/openharness_mm.git`
 - Branch: `web-mvp-rag`
-- Latest local commit: `docs: plan tacit knowledge graph pipeline`
-- `private/web-mvp-rag` and `origin/web-mvp-rag` should be pushed to this planning commit.
+- Latest synced commit before this planning update: `2c41eb4 feat(web): add knowledge match checklist panel`
+- `private/web-mvp-rag` and `origin/web-mvp-rag` were verified at `2c41eb4` on 2026-04-17 before adding the new agent architecture plan.
 - Original `upstream` is not used for this private development flow.
 
 ## Server Environment Variables
@@ -259,6 +259,36 @@ Implemented:
 - Proposal Ops merges matched inquiry cards into `manager_questions`.
 - Web structured-analysis output now renders a `지식 기반 체크리스트/문의항목` section.
 - Web document-processing output now also has a dedicated `지식 기반 체크리스트` card panel with per-item check toggles.
+
+## Next Major Direction: Real Agent Architecture
+
+The next development must shift from feature-level MVP tools to a real agent workflow.
+
+New plan document:
+
+- `docs/ANNOUNCEMENT_PROPOSAL_AGENT_PLAN.md`
+
+Core decision:
+
+- The system should not be treated as an agent unless it records plan, tool use, evidence, decision, assignment, communication, and feedback.
+- Current RAG, announcement analysis, tacit knowledge, proposal ops, and workbook generation should become tools used by an orchestrating `AnnouncementProposalAgent`.
+- The next implementation starts with `AgentRun` and an orchestrator, not more UI polish.
+
+Immediate start date:
+
+- 2026-04-17 or the next session.
+
+Immediate next file:
+
+- `src/openharness/services/workflows/announcement_proposal_agent.py`
+
+Immediate next tasks:
+
+1. Add `AgentRun`, `AgentStep`, `AgentDecision`, `AgentAssignment`, and `AgentOutput` structures.
+2. Add `AgentRunStore` JSON persistence.
+3. Add tests for run creation, step recording, and decision recording.
+4. Wrap the existing announcement-agent flow in a minimal `AnnouncementProposalAgent` orchestrator.
+5. Convert raw `knowledge_matches` into explicit applicability decisions before surfacing them.
 
 Verification:
 
